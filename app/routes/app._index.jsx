@@ -73,7 +73,6 @@ export const loader = async ({ request }) => {
     productIds: b.products.map((p) => p.productId),
   }));
 
-  // Real Analytics Aggregation
   const totalImpressions = badgesMap.reduce((acc, b) => acc + b.impressions, 0);
   const totalClicks = badgesMap.reduce((acc, b) => acc + b.clicks, 0);
   const overallCTR = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(1) : "0.0";
@@ -277,27 +276,135 @@ export default function AppDashboard() {
                           </Grid.Cell>
                         </Grid>
 
-                        {/* Compact Color Fields */}
-                        <InlineStack gap="600" align="start">
-                          <Box width="140px">
-                            <TextField
-                              label="Background Color"
-                              value={activeBadge.bgColor}
-                              onChange={(val) => updateActiveBadge("bgColor", val)}
-                              autoComplete="off"
-                              type="color"
-                            />
-                          </Box>
-                          <Box width="140px">
-                            <TextField
-                              label="Text Color"
-                              value={activeBadge.textColor}
-                              onChange={(val) => updateActiveBadge("textColor", val)}
-                              autoComplete="off"
-                              type="color"
-                            />
-                          </Box>
-                        </InlineStack>
+                        {/* REDESIGNED ENHANCED COLOR SECTION */}
+                        <BlockStack gap="200">
+                          <Text as="h3" variant="headingSm">Badge Colors</Text>
+                          <Grid>
+                            <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
+                              <BlockStack gap="200">
+                                <TextField
+                                  label="Background Color"
+                                  value={activeBadge.bgColor}
+                                  onChange={(val) => updateActiveBadge("bgColor", val)}
+                                  autoComplete="off"
+                                  placeholder="#000000"
+                                  connectedLeft={
+                                    <Box padding="100">
+                                      <div
+                                        style={{
+                                          width: "28px",
+                                          height: "28px",
+                                          borderRadius: "6px",
+                                          backgroundColor: activeBadge.bgColor || "#000000",
+                                          border: "1px solid #CBD5E1",
+                                          position: "relative",
+                                          overflow: "hidden",
+                                          cursor: "pointer",
+                                        }}
+                                      >
+                                        <input
+                                          type="color"
+                                          value={activeBadge.bgColor || "#000000"}
+                                          onChange={(e) => updateActiveBadge("bgColor", e.target.value)}
+                                          style={{
+                                            position: "absolute",
+                                            top: "-10px",
+                                            left: "-10px",
+                                            width: "50px",
+                                            height: "50px",
+                                            opacity: 0,
+                                            cursor: "pointer",
+                                          }}
+                                        />
+                                      </div>
+                                    </Box>
+                                  }
+                                />
+                                <InlineStack gap="100">
+                                  {["#D97706", "#DC2626", "#111827", "#16A34A", "#2563EB", "#7C3AED"].map((presetHex) => (
+                                    <button
+                                      key={presetHex}
+                                      type="button"
+                                      onClick={() => updateActiveBadge("bgColor", presetHex)}
+                                      style={{
+                                        width: "22px",
+                                        height: "22px",
+                                        borderRadius: "50%",
+                                        backgroundColor: presetHex,
+                                        border: activeBadge.bgColor === presetHex ? "2px solid #000" : "1px solid #CBD5E1",
+                                        cursor: "pointer",
+                                        padding: 0,
+                                      }}
+                                      title={presetHex}
+                                    />
+                                  ))}
+                                </InlineStack>
+                              </BlockStack>
+                            </Grid.Cell>
+
+                            <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
+                              <BlockStack gap="200">
+                                <TextField
+                                  label="Text Color"
+                                  value={activeBadge.textColor}
+                                  onChange={(val) => updateActiveBadge("textColor", val)}
+                                  autoComplete="off"
+                                  placeholder="#FFFFFF"
+                                  connectedLeft={
+                                    <Box padding="100">
+                                      <div
+                                        style={{
+                                          width: "28px",
+                                          height: "28px",
+                                          borderRadius: "6px",
+                                          backgroundColor: activeBadge.textColor || "#FFFFFF",
+                                          border: "1px solid #CBD5E1",
+                                          position: "relative",
+                                          overflow: "hidden",
+                                          cursor: "pointer",
+                                        }}
+                                      >
+                                        <input
+                                          type="color"
+                                          value={activeBadge.textColor || "#FFFFFF"}
+                                          onChange={(e) => updateActiveBadge("textColor", e.target.value)}
+                                          style={{
+                                            position: "absolute",
+                                            top: "-10px",
+                                            left: "-10px",
+                                            width: "50px",
+                                            height: "50px",
+                                            opacity: 0,
+                                            cursor: "pointer",
+                                          }}
+                                        />
+                                      </div>
+                                    </Box>
+                                  }
+                                />
+                                <InlineStack gap="100">
+                                  {["#FFFFFF", "#000000", "#F3F4F6", "#FEF2F2", "#FEF3C7"].map((presetHex) => (
+                                    <button
+                                      key={presetHex}
+                                      type="button"
+                                      onClick={() => updateActiveBadge("textColor", presetHex)}
+                                      style={{
+                                        width: "22px",
+                                        height: "22px",
+                                        borderRadius: "50%",
+                                        backgroundColor: presetHex,
+                                        border: activeBadge.textColor === presetHex ? "2px solid #000" : "1px solid #CBD5E1",
+                                        cursor: "pointer",
+                                        padding: 0,
+                                      }}
+                                      title={presetHex}
+                                    />
+                                  ))}
+                                </InlineStack>
+                              </BlockStack>
+                            </Grid.Cell>
+                          </Grid>
+                        </BlockStack>
 
                         <Grid>
                           <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
@@ -562,7 +669,6 @@ export default function AppDashboard() {
                         <Text as="h3" variant="headingSm">Step 1: Open Theme Editor</Text>
                         <p>Click the button below to open your store's live Theme Customizer (opens in new tab to avoid iframe blocks):</p>
                         
-                        {/* Target Top Fixed to prevent Refused to connect error */}
                         <Button
                           url={`https://${shop}/admin/themes/current/editor?context=apps`}
                           target="_top"

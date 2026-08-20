@@ -1,13 +1,15 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "f81598b8bf15bfdd4165afb29ef957c4"
-application_url = "https://example.com"
+application_url = "https://fs-custom-badges.vercel.app"
 embedded = true
 name = "fs-custom-badges"
+
 [app_proxy]
 url = "https://shopify.dev"
 subpath = "badges"
 prefix = "apps"
+
 [webhooks]
 api_version = "2026-10"
 
@@ -21,11 +23,14 @@ api_version = "2026-10"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = ""
+scopes = "write_products,read_products"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [
+  "https://fs-custom-badges.vercel.app/auth/callback",
+  "https://fs-custom-badges.vercel.app/auth/shopify/callback",
+  "https://fs-custom-badges.vercel.app/api/auth"
+]
 
 [build]
-include_config_on_deploy = true
 automatically_update_urls_on_dev = true
