@@ -1,0 +1,126 @@
+<script>
+  (function() {
+    console.log("👉 [Custom Badges]: App Embed Loaded");
+
+    async function loadBadges() {
+      try {
+        const shop = "{{ shop.permanent_domain }}";
+        
+        const response = await fetch(`/apps/badges/api/badges?shop=${shop}`);
+        
+        const contentType = response.headers.get("content-type");
+        if (!response.ok || !contentType || !contentType.includes("application/json")) {
+          console.warn("⚠️ [Custom Badges]: App Proxy non-JSON response.");
+          return;
+        }
+
+        const data = await response.json();
+        if (!data.badges || data.badges.length === 0) return;
+
+        const cards = document.querySelectorAll('.card-wrapper, .card, .grid__item, product-card, .product-card');
+
+        cards.forEach((card) => {
+          data.badges.forEach((badge) => {
+            if (badge.isGlobal) {
+              injectBadge(card, badge);
+            }
+          });
+        });
+
+      } catch (err) {
+        console.error("❌ [Custom Badges] Fetch error:", err);
+      }
+    }
+
+    function trackEvent(badgeId, type) {
+      try {
+        fetch('/apps/badges/api/badges', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ badgeId, type }),
+        });
+      } catch (e) {
+        console.error("Tracking Error:", e);
+      }
+    }
+
+    function injectBadge(card, badge) {
+      if (card.querySelector(`[data-badge-id="${badge.id}"]`)) return;
+
+      const media = card.querySelector('.card__media') || card.querySelector('.media') || card;
+      media.style.position = 'relative';
+
+      const badgeEl = document.createElement('div');
+      badgeEl.className = 'fs-custom-badge-rendered';
+      badgeEl.setAttribute('data-badge-id', badge.id);
+      
+      const iconSpan = badge.icon ? `<span>${badge.icon}</span> ` : '';
+      badgeEl.innerHTML = `${iconSpan}<span>${badge.text}</span>`;
+      
+      let posStyle = 'top: 10px; left: 10px;';
+      if (badge.position === 'top-right') posStyle = 'top: 10px; right: 10px;';
+      if (badge.position === 'bottom-left') posStyle = 'bottom: 10px; left: 10px;';
+      if (badge.position === 'bottom-right') posStyle = 'bottom: 10px; right: 10px;';
+      if (badge.position === 'overlay') posStyle = 'top: 50%; left: 50%; transform: translate(-50%, -50%);';
+
+      let borderRadius = '20px';
+      let borderStyle = 'none';
+      let bgStyle = badge.bgColor;
+      let textStyle = badge.textColor;
+
+      if (badge.shape === 'sharp') borderRadius = '0px';
+      if (badge.shape === 'ribbon') borderRadius = '0 8px 8px 0';
+      if (badge.shape === 'outline') {
+        borderRadius = '6px';
+        borderStyle = `2px solid ${badge.bgColor}`;
+        bgStyle = 'transparent';
+        textStyle = badge.bgColor;
+      }
+
+      badgeEl.style.cssText = `
+        position: absolute;
+        background-color: ${bgStyle};
+        color: ${textStyle};
+        font-size: ${badge.fontSize || 11}px;
+        padding: 5px 12px;
+        border-radius: ${borderRadius};
+        border: ${borderStyle};
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        z-index: 30;
+        box-shadow: ${badge.shape === 'outline' ? 'none' : '0 4px 8px rgba(0,0,0,0.2)'};
+        pointer-events: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        line-height: 1;
+        ${posStyle}
+      `;
+
+      media.appendChild(badgeEl);
+
+      // 1. Track Impression
+      trackEvent(badge.id, 'impression');
+
+      // 2. Track Click
+      card.addEventListener('click', function() {
+        trackEvent(badge.id, 'click');
+      }, { once: true });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', loadBadges);
+    } else {
+      loadBadges();
+    }
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Custom Badges Embed",
+  "target": "body",
+  "settings": []
+}
+{% endschema %}
