@@ -34,7 +34,7 @@
         }
 
         const cards = document.querySelectorAll(
-          ".card-wrapper, .card, .grid__item, product-card, .product-card"
+          ".card-wrapper, .card, .grid__item, product-card, .product-card, .product-item, [data-product-id]"
         );
 
         console.log(
@@ -42,15 +42,14 @@
         );
 
         cards.forEach((card) => {
-          const cardProductId = extractProductId(card);
+          const cardIdentifiers = extractProductIdentifiers(card);
 
           console.log(
-            "🛍️ Product card ID:",
-            cardProductId
+            "🛍️ Product card Identifiers:",
+            cardIdentifiers
           );
 
           data.badges.forEach((badge) => {
-
             /*
              * GLOBAL BADGE
              */
@@ -62,13 +61,20 @@
             /*
              * SPECIFIC PRODUCT BADGE
              */
-            if (!cardProductId || !badge.productIds) {
+            if (!cardIdentifiers.length || !badge.productIds || badge.productIds.length === 0) {
               return;
             }
 
-            const isTargeted = badge.productIds.some(
-              (id) => normalizeProductId(id) === normalizeProductId(cardProductId)
-            );
+            const isTargeted = badge.productIds.some((targetId) => {
+              const cleanTarget = normalizeProductId(targetId);
+              return cardIdentifiers.some((cardId) => {
+                const cleanCardId = normalizeProductId(cardId);
+                return (
+                  cardId === targetId ||
+                  (cleanTarget && cleanCardId && cleanTarget === cleanCardId)
+                );
+              });
+            });
 
             console.log(
               "🎯 Badge:",
@@ -93,106 +99,64 @@
 
 
     /*
-     * Get the Shopify Product ID from the product card.
+     * Extract all possible product identifiers (IDs, Handles) from card DOM
      */
-    function extractProductId(card) {
+    function extractProductIdentifiers(card) {
+      const identifiers = new Set();
 
-      /*
-       * 1. Check data-product-id
-       */
-      if (card.dataset.productId) {
-        return card.dataset.productId;
+      // 1. Direct dataset attributes
+      if (card.dataset.productId) identifiers.add(card.dataset.productId);
+      if (card.dataset.id) identifiers.add(card.dataset.id);
+      if (card.dataset.productHandle) identifiers.add(card.dataset.productHandle);
+
+      // 2. Query internal element data attributes
+      const dataEl = card.querySelector("[data-product-id], [data-id], [data-product-handle]");
+      if (dataEl) {
+        if (dataEl.dataset.productId) identifiers.add(dataEl.dataset.productId);
+        if (dataEl.dataset.id) identifiers.add(dataEl.dataset.id);
+        if (dataEl.dataset.productHandle) identifiers.add(dataEl.dataset.productHandle);
       }
 
-      /*
-       * 2. Check common Shopify product-card attributes
-       */
-      const possibleElements = [
-        card,
-        card.querySelector("[data-product-id]"),
-        card.querySelector("[data-product-handle]"),
-        card.querySelector("a[href*='/products/']")
-      ];
+      // 3. Check form hidden inputs (Quick View / Add To Cart forms inside cards)
+      const inputEl = card.querySelector('input[name="id"], input[name="product-id"]');
+      if (inputEl && inputEl.value) identifiers.add(inputEl.value);
 
-      for (const element of possibleElements) {
-
-        if (!element) {
-          continue;
-        }
-
-        if (
-          element.dataset &&
-          element.dataset.productId
-        ) {
-          return element.dataset.productId;
-        }
-
-        /*
-         * Some themes expose product information
-         * through JSON attributes.
-         */
-        if (
-          element.dataset &&
-          element.dataset.productHandle
-        ) {
-          return element.dataset.productHandle;
-        }
+      // 4. Check embedded JSON data
+      const jsonScript = card.querySelector('script[type="application/json"]');
+      if (jsonScript) {
+        try {
+          const parsed = JSON.parse(jsonScript.textContent);
+          if (parsed.id) identifiers.add(String(parsed.id));
+          if (parsed.product_id) identifiers.add(String(parsed.product_id));
+          if (parsed.handle) identifiers.add(parsed.handle);
+        } catch (e) {}
       }
 
-      /*
-       * 3. Product URL fallback
-       */
-      const link = card.querySelector(
-        'a[href*="/products/"]'
-      );
-
+      // 5. Fallback to product anchor href handle parsing
+      const link = card.querySelector('a[href*="/products/"]');
       if (link) {
         const href = link.getAttribute("href");
-
-        const match = href.match(
-          /\/products\/([^/?#]+)/
-        );
-
-        if (match) {
-          return match[1];
+        const match = href.match(/\/products\/([^/?#]+)/);
+        if (match && match[1]) {
+          identifiers.add(match[1]);
         }
       }
 
-      return null;
+      return Array.from(identifiers);
     }
 
 
     /*
-     * Normalize Shopify Product IDs.
-     *
-     * gid://shopify/Product/123
-     * becomes
-     * 123
+     * Normalize Product IDs (Strips GIDs to clean digits)
      */
     function normalizeProductId(id) {
-
-      if (!id) {
-        return null;
-      }
-
+      if (!id) return null;
       const value = String(id);
-
-      const gidMatch = value.match(
-        /gid:\/\/shopify\/Product\/(\d+)/
-      );
-
-      if (gidMatch) {
-        return gidMatch[1];
-      }
-
-      /*
-       * If it is already a numeric ID.
-       */
-      if (/^\d+$/.test(value)) {
-        return value;
-      }
-
-      return value;
+      const gidMatch = value.match(/gid:\/\/shopify\/Product\/(\d+)/);
+      if (gidMatch) return gidMatch[1];
+      
+      const numbersOnly = value.replace(/\D/g, "");
+      return numbersOnly || value;
     }
 
 
@@ -218,7 +182,6 @@
 
 
     function injectBadge(card, badge) {
-
       if (
         card.querySelector(
           `[data-badge-id="${badge.id}"]`

@@ -28,18 +28,25 @@ export const loader = async ({ request }) => {
       include: { products: true },
     });
 
-    const responseBadges = badges.map((b) => ({
-      id: b.id,
-      text: b.text,
-      bgColor: b.bgColor,
-      textColor: b.textColor,
-      position: b.position,
-      fontSize: b.fontSize || 11,
-      icon: b.icon || "",
-      shape: b.shape || "pill",
-      isGlobal: b.isGlobal,
-      productIds: b.products.map((p) => p.productId),
-    }));
+    const responseBadges = badges.map((b) => {
+      const rawProductIds = b.products.map((p) => p.productId);
+      
+      // Extract numeric IDs alongside full GIDs for seamless theme matching
+      const numericIds = rawProductIds.map((id) => id.replace(/\D/g, "")).filter(Boolean);
+
+      return {
+        id: b.id,
+        text: b.text,
+        bgColor: b.bgColor,
+        textColor: b.textColor,
+        position: b.position,
+        fontSize: b.fontSize || 11,
+        icon: b.icon || "",
+        shape: b.shape || "pill",
+        isGlobal: b.isGlobal,
+        productIds: [...new Set([...rawProductIds, ...numericIds])],
+      };
+    });
 
     return json({ badges: responseBadges }, { headers: corsHeaders });
   } catch (error) {
