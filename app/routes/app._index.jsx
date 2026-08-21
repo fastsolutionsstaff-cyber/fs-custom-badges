@@ -142,18 +142,28 @@ export default function AppDashboard() {
   };
 
   const handleSelectProducts = async () => {
-    if (typeof window !== "undefined" && window.shopify?.resourcePicker) {
-      const selected = await window.shopify.resourcePicker({
-        type: "product",
-        multiple: true,
-        selectionIds: activeBadge.productIds.map((id) => ({ id })),
+  if (typeof window !== "undefined" && window.shopify?.resourcePicker) {
+    const selected = await window.shopify.resourcePicker({
+      type: "product",
+      multiple: true,
+      selectionIds: activeBadge.productIds.map((id) => ({ id })),
+    });
+
+    if (selected) {
+      console.log("SELECTED PRODUCTS FROM SHOPIFY:", selected);
+
+      const ids = selected.map((product) => {
+        // Shopify Resource Picker normally returns the product GID.
+        // Keep the GID because this is the actual Shopify product ID.
+        return product.id;
       });
-      if (selected) {
-        const ids = selected.map((p) => p.id);
-        updateActiveBadge("productIds", ids);
-      }
+
+      console.log("SAVED PRODUCT IDS:", ids);
+
+      updateActiveBadge("productIds", ids);
     }
-  };
+  }
+};
 
   const handleSave = () => {
     const data = new FormData();
