@@ -22,7 +22,7 @@ api_version = "2026-10"
   topics = [ "app/scopes_update" ]
 
 [access_scopes]
-scopes = ""
+scopes = "write_app_proxy"
 
 [auth]
 redirect_urls = [
