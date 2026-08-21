@@ -6,19 +6,19 @@
       try {
         const shop = "{{ shop.permanent_domain }}";
 
-        /*
-         * IMPORTANT:
-         * /apps/badges is the Shopify App Proxy URL.
-         * Your app.toml already maps this to:
-         * https://fs-custom-badges.vercel.app/api/badges
-         */
-        const response = await fetch(`/apps/badges?shop=${encodeURIComponent(shop)}`);
+        const response = await fetch(
+          `/apps/badges?shop=${encodeURIComponent(shop)}`
+        );
 
         const contentType = response.headers.get("content-type");
 
-        if (!response.ok || !contentType || !contentType.includes("application/json")) {
+        if (
+          !response.ok ||
+          !contentType ||
+          !contentType.includes("application/json")
+        ) {
           console.warn(
-            "⚠️ [Custom Badges]: App Proxy returned a non-JSON response.",
+            "⚠️ [Custom Badges]: App Proxy non-JSON response.",
             response.status
           );
           return;
@@ -34,7 +34,7 @@
         }
 
         const cards = document.querySelectorAll(
-          '.card-wrapper, .card, .grid__item, product-card, .product-card'
+          ".card-wrapper, .card, .grid__item, product-card, .product-card"
         );
 
         console.log(
@@ -44,37 +44,113 @@
         cards.forEach((card) => {
           const cardProductId = extractProductId(card);
 
-          data.badges.forEach((badge) => {
-            const isTargeted =
-              badge.productIds &&
-              cardProductId &&
-              badge.productIds.some((id) =>
-                id.includes(cardProductId)
-              );
+          console.log(
+            "🛍️ Product card ID:",
+            cardProductId
+          );
 
-            if (badge.isGlobal || isTargeted) {
+          data.badges.forEach((badge) => {
+
+            /*
+             * GLOBAL BADGE
+             */
+            if (badge.isGlobal) {
+              injectBadge(card, badge);
+              return;
+            }
+
+            /*
+             * SPECIFIC PRODUCT BADGE
+             */
+            if (!cardProductId || !badge.productIds) {
+              return;
+            }
+
+            const isTargeted = badge.productIds.some(
+              (id) => normalizeProductId(id) === normalizeProductId(cardProductId)
+            );
+
+            console.log(
+              "🎯 Badge:",
+              badge.text,
+              "Targeted:",
+              isTargeted
+            );
+
+            if (isTargeted) {
               injectBadge(card, badge);
             }
           });
         });
 
       } catch (err) {
-        console.error("❌ [Custom Badges] Fetch error:", err);
+        console.error(
+          "❌ [Custom Badges] Fetch error:",
+          err
+        );
       }
     }
 
+
+    /*
+     * Get the Shopify Product ID from the product card.
+     */
     function extractProductId(card) {
+
+      /*
+       * 1. Check data-product-id
+       */
       if (card.dataset.productId) {
         return card.dataset.productId;
       }
 
-      const link = card.querySelector('a[href*="/products/"]');
+      /*
+       * 2. Check common Shopify product-card attributes
+       */
+      const possibleElements = [
+        card,
+        card.querySelector("[data-product-id]"),
+        card.querySelector("[data-product-handle]"),
+        card.querySelector("a[href*='/products/']")
+      ];
+
+      for (const element of possibleElements) {
+
+        if (!element) {
+          continue;
+        }
+
+        if (
+          element.dataset &&
+          element.dataset.productId
+        ) {
+          return element.dataset.productId;
+        }
+
+        /*
+         * Some themes expose product information
+         * through JSON attributes.
+         */
+        if (
+          element.dataset &&
+          element.dataset.productHandle
+        ) {
+          return element.dataset.productHandle;
+        }
+      }
+
+      /*
+       * 3. Product URL fallback
+       */
+      const link = card.querySelector(
+        'a[href*="/products/"]'
+      );
 
       if (link) {
         const href = link.getAttribute("href");
 
         const match = href.match(
-          /\/products\/([a-zA-Z0-9\-_]+)/
+          /\/products\/([^/?#]+)/
         );
 
         if (match) {
@@ -84,6 +160,41 @@
 
       return null;
     }
+
+
+    /*
+     * Normalize Shopify Product IDs.
+     *
+     * gid://shopify/Product/123
+     * becomes
+     * 123
+     */
+    function normalizeProductId(id) {
+
+      if (!id) {
+        return null;
+      }
+
+      const value = String(id);
+
+      const gidMatch = value.match(
+        /gid:\/\/shopify\/Product\/(\d+)/
+      );
+
+      if (gidMatch) {
+        return gidMatch[1];
+      }
+
+      /*
+       * If it is already a numeric ID.
+       */
+      if (/^\d+$/.test(value)) {
+        return value;
+      }
+
+      return value;
+    }
+
 
     function trackEvent(badgeId, type) {
       try {
@@ -98,11 +209,16 @@
           })
         });
       } catch (e) {
-        console.error("Tracking Error:", e);
+        console.error(
+          "Tracking Error:",
+          e
+        );
       }
     }
 
+
     function injectBadge(card, badge) {
+
       if (
         card.querySelector(
           `[data-badge-id="${badge.id}"]`
@@ -118,9 +234,11 @@
 
       media.style.position = "relative";
 
-      const badgeEl = document.createElement("div");
+      const badgeEl =
+        document.createElement("div");
 
-      badgeEl.className = "fs-custom-badge-rendered";
+      badgeEl.className =
+        "fs-custom-badge-rendered";
 
       badgeEl.setAttribute(
         "data-badge-id",
@@ -133,6 +251,7 @@
 
       badgeEl.innerHTML =
         `${iconSpan}<span>${badge.text}</span>`;
+
 
       let posStyle =
         "top: 10px; left: 10px;";
@@ -157,10 +276,12 @@
           "top: 50%; left: 50%; transform: translate(-50%, -50%);";
       }
 
+
       let borderRadius = "20px";
       let borderStyle = "none";
       let bgStyle = badge.bgColor;
       let textStyle = badge.textColor;
+
 
       if (badge.shape === "sharp") {
         borderRadius = "0px";
@@ -174,9 +295,11 @@
         borderRadius = "6px";
         borderStyle =
           `2px solid ${badge.bgColor}`;
+
         bgStyle = "transparent";
         textStyle = badge.bgColor;
       }
+
 
       badgeEl.style.cssText = `
         position: absolute;
@@ -203,12 +326,14 @@
         ${posStyle}
       `;
 
+
       media.appendChild(badgeEl);
 
       trackEvent(
         badge.id,
         "impression"
       );
+
 
       card.addEventListener(
         "click",
@@ -222,6 +347,7 @@
       );
     }
 
+
     if (
       document.readyState === "loading"
     ) {
@@ -232,8 +358,10 @@
     } else {
       loadBadges();
     }
+
   })();
 </script>
+
 
 {% schema %}
 {
