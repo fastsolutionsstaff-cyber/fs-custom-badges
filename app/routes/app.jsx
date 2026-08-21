@@ -22,7 +22,11 @@ export default function App() {
         <Link to="/app" rel="home">
           Dashboard
         </Link>
+        {/* Badges Features directly together */}
+        <Link to="/app/product-label">Product Labels Guide</Link>
         <Link to="/app/showcase">Widget Showcase</Link>
+        
+        {/* Support & Documentation Links */}
         <Link to="/app/how-it-works">How It Works</Link>
         <Link to="/app/support">Support & FAQ</Link>
         <Link to="/app/privacy">Privacy Policy</Link>

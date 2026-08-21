@@ -1,0 +1,250 @@
+{%- comment -%}
+  Product Label Block for Product Details Page (PDP)
+{%- endcomment -%}
+
+{% assign current_product = product %}
+
+<div 
+  class="fs-pdp-label-wrapper" 
+  id="fs-pdp-label-{{ block.id }}"
+  data-product-id="{{ current_product.id }}"
+  style="
+    --label-bg-color: {{ block.settings.bg_color }};
+    --label-text-color: {{ block.settings.text_color }};
+    --label-font-size: {{ block.settings.font_size }}px;
+    --label-border-radius: {{ block.settings.border_radius }}px;
+    --label-padding-v: {{ block.settings.padding_vertical }}px;
+    --label-padding-h: {{ block.settings.padding_horizontal }}px;
+    --label-margin-top: {{ block.settings.margin_top }}px;
+    --label-margin-bottom: {{ block.settings.margin_bottom }}px;
+    --label-letter-spacing: {{ block.settings.letter_spacing }}px;
+  "
+>
+  {%- comment -%} Fallback label if no API response or for preview in Theme Editor {%- endcomment -%}
+  {% if request.design_mode %}
+    <span class="fs-pdp-badge fs-shape-{{ block.settings.badge_shape }}">
+      {% if block.settings.show_icon and block.settings.default_icon != blank %}
+        <span class="fs-badge-icon">{{ block.settings.default_icon }}</span>
+      {% endif %}
+      <span class="fs-badge-text">{{ block.settings.preview_text | default: "BESTSELLER" }}</span>
+    </span>
+  {% endif %}
+</div>
+
+<style>
+  .fs-pdp-label-wrapper {
+    display: flex;
+    align-items: center;
+    margin-top: var(--label-margin-top);
+    margin-bottom: var(--label-margin-bottom);
+    width: 100%;
+  }
+
+  .fs-pdp-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background-color: var(--label-bg-color);
+    color: var(--label-text-color);
+    font-size: var(--label-font-size);
+    font-weight: 700;
+    padding: var(--label-padding-v) var(--label-padding-h);
+    border-radius: var(--label-border-radius);
+    letter-spacing: var(--label-letter-spacing);
+    text-transform: uppercase;
+    line-height: 1.2;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Shapes */
+  .fs-pdp-badge.fs-shape-pill {
+    border-radius: 50px;
+  }
+  .fs-pdp-badge.fs-shape-rounded {
+    border-radius: 6px;
+  }
+  .fs-pdp-badge.fs-shape-sharp {
+    border-radius: 0px;
+  }
+  .fs-pdp-badge.fs-shape-outline {
+    background-color: transparent !important;
+    border: 2px solid var(--label-bg-color);
+    color: var(--label-bg-color);
+  }
+
+  .fs-badge-icon {
+    display: inline-flex;
+    align-items: center;
+  }
+</style>
+
+<script>
+  (function() {
+    const wrapper = document.getElementById("fs-pdp-label-{{ block.id }}");
+    if (!wrapper) return;
+
+    const productId = wrapper.dataset.productId;
+    const shop = "{{ shop.permanent_domain }}";
+
+    if (!productId) return;
+
+    async function fetchPDPLabel() {
+      try {
+        const response = await fetch(`/apps/badges?shop=${encodeURIComponent(shop)}`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (!data.badges || data.badges.length === 0) return;
+
+        // Clean target IDs matching
+        const matchingBadge = data.badges.find(badge => {
+          if (badge.isGlobal) return true;
+          if (!badge.productIds) return false;
+
+          return badge.productIds.some(id => {
+            const cleanId = String(id).replace(/\D/g, "");
+            return cleanId === String(productId);
+          });
+        });
+
+        if (matchingBadge) {
+          const iconHtml = matchingBadge.icon ? `<span class="fs-badge-icon">${matchingBadge.icon}</span>` : "";
+          const badgeShapeClass = "fs-shape-{{ block.settings.badge_shape }}";
+
+          wrapper.innerHTML = `
+            <span class="fs-pdp-badge ${badgeShapeClass}">
+              ${iconHtml}
+              <span class="fs-badge-text">${matchingBadge.text}</span>
+            </span>
+          `;
+          
+          // Track Impression
+          fetch("/apps/badges", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ badgeId: matchingBadge.id, type: "impression" })
+          }).catch(() => {});
+        }
+      } catch (err) {
+        console.error("PDP Label Fetch Error:", err);
+      }
+    }
+
+    // Don't override shopify design mode preview
+    if (!window.Shopify || !window.Shopify.designMode) {
+      fetchPDPLabel();
+    }
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Product Badge Label",
+  "target": "section",
+  "settings": [
+    {
+      "type": "header",
+      "content": "🎨 Label Styling (Theme Editor)"
+    },
+    {
+      "type": "select",
+      "id": "badge_shape",
+      "label": "Badge Shape",
+      "options": [
+        { "value": "rounded", "label": "Rounded Corners" },
+        { "value": "pill", "label": "Pill / Capsule" },
+        { "value": "sharp", "label": "Sharp Square" },
+        { "value": "outline", "label": "Modern Outline" }
+      ],
+      "default": "rounded"
+    },
+    {
+      "type": "color",
+      "id": "bg_color",
+      "label": "Background Color",
+      "default": "#111111"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text Color",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "range",
+      "id": "font_size",
+      "min": 10,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "label": "Font Size",
+      "default": 13
+    },
+    {
+      "type": "range",
+      "id": "letter_spacing",
+      "min": 0,
+      "max": 3,
+      "step": 0.5,
+      "unit": "px",
+      "label": "Letter Spacing",
+      "default": 1
+    },
+    {
+      "type": "header",
+      "content": "📐 Spacing & Padding"
+    },
+    {
+      "type": "range",
+      "id": "padding_vertical",
+      "min": 2,
+      "max": 16,
+      "step": 1,
+      "unit": "px",
+      "label": "Vertical Padding",
+      "default": 6
+    },
+    {
+      "type": "range",
+      "id": "padding_horizontal",
+      "min": 6,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "label": "Horizontal Padding",
+      "default": 14
+    },
+    {
+      "type": "range",
+      "id": "margin_top",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "label": "Top Margin",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "margin_bottom",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "label": "Bottom Margin",
+      "default": 12
+    },
+    {
+      "type": "header",
+      "content": "👁️ Theme Editor Preview"
+    },
+    {
+      "type": "text",
+      "id": "preview_text",
+      "label": "Preview Text (Editor Only)",
+      "default": "🔥 HOT SELLER"
+    }
+  ]
+}
+{% endschema %}
