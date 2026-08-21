@@ -4,6 +4,7 @@
 
 {% assign current_product = product %}
 
+{% if current_product %}
 <div 
   class="fs-pdp-label-wrapper" 
   id="fs-pdp-label-{{ block.id }}"
@@ -20,13 +21,12 @@
     --label-letter-spacing: {{ block.settings.letter_spacing }}px;
   "
 >
-  {%- comment -%} Fallback label if no API response or for preview in Theme Editor {%- endcomment -%}
   {% if request.design_mode %}
     <span class="fs-pdp-badge fs-shape-{{ block.settings.badge_shape }}">
       {% if block.settings.show_icon and block.settings.default_icon != blank %}
         <span class="fs-badge-icon">{{ block.settings.default_icon }}</span>
       {% endif %}
-      <span class="fs-badge-text">{{ block.settings.preview_text | default: "BESTSELLER" }}</span>
+      <span class="fs-badge-text">{{ block.settings.preview_text | default: "⚡ LIMITED STOCK" }}</span>
     </span>
   {% endif %}
 </div>
@@ -54,29 +54,18 @@
     text-transform: uppercase;
     line-height: 1.2;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   }
 
-  /* Shapes */
-  .fs-pdp-badge.fs-shape-pill {
-    border-radius: 50px;
-  }
-  .fs-pdp-badge.fs-shape-rounded {
-    border-radius: 6px;
-  }
-  .fs-pdp-badge.fs-shape-sharp {
-    border-radius: 0px;
-  }
+  .fs-pdp-badge.fs-shape-pill { border-radius: 50px; }
+  .fs-pdp-badge.fs-shape-rounded { border-radius: 6px; }
+  .fs-pdp-badge.fs-shape-sharp { border-radius: 0px; }
   .fs-pdp-badge.fs-shape-outline {
     background-color: transparent !important;
     border: 2px solid var(--label-bg-color);
     color: var(--label-bg-color);
   }
 
-  .fs-badge-icon {
-    display: inline-flex;
-    align-items: center;
-  }
+  .fs-badge-icon { display: inline-flex; align-items: center; }
 </style>
 
 <script>
@@ -97,7 +86,6 @@
         const data = await response.json();
         if (!data.badges || data.badges.length === 0) return;
 
-        // Clean target IDs matching
         const matchingBadge = data.badges.find(badge => {
           if (badge.isGlobal) return true;
           if (!badge.productIds) return false;
@@ -118,25 +106,18 @@
               <span class="fs-badge-text">${matchingBadge.text}</span>
             </span>
           `;
-          
-          // Track Impression
-          fetch("/apps/badges", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ badgeId: matchingBadge.id, type: "impression" })
-          }).catch(() => {});
         }
       } catch (err) {
         console.error("PDP Label Fetch Error:", err);
       }
     }
 
-    // Don't override shopify design mode preview
     if (!window.Shopify || !window.Shopify.designMode) {
       fetchPDPLabel();
     }
   })();
 </script>
+{% endif %}
 
 {% schema %}
 {
@@ -145,7 +126,7 @@
   "settings": [
     {
       "type": "header",
-      "content": "🎨 Label Styling (Theme Editor)"
+      "content": "🎨 Label Styling"
     },
     {
       "type": "select",
@@ -243,7 +224,7 @@
       "type": "text",
       "id": "preview_text",
       "label": "Preview Text (Editor Only)",
-      "default": "🔥 HOT SELLER"
+      "default": "⚡ LIMITED STOCK"
     }
   ]
 }

@@ -1,6 +1,12 @@
 <script>
   (function() {
-    console.log("👉 [Custom Badges]: App Embed Loaded");
+    // 🛑 STOP EXECUTION ON PRODUCT DETAIL PAGES (PDP)
+    // PDP page par sirf humara Naya Product Label Block kaam karega
+    if (window.location.pathname.includes('/products/')) {
+      return;
+    }
+
+    console.log("👉 [Custom Badges]: App Embed Loaded (Collection Cards)");
 
     async function loadBadges() {
       try {
@@ -41,14 +47,8 @@
           `🔎 [Custom Badges]: Found ${cards.length} product cards.`
         );
 
-        // Async loop to resolve API fallbacks for product cards sequentially
         for (const card of cards) {
           const cardIdentifiers = await extractProductIdentifiers(card);
-
-          console.log(
-            "🛍️ Product card Identifiers:",
-            cardIdentifiers
-          );
 
           data.badges.forEach((badge) => {
             /*
@@ -77,13 +77,6 @@
               });
             });
 
-            console.log(
-              "🎯 Badge:",
-              badge.text,
-              "Targeted:",
-              isTargeted
-            );
-
             if (isTargeted) {
               injectBadge(card, badge);
             }
@@ -100,27 +93,23 @@
 
 
     /*
-     * Extract all possible product identifiers (IDs, Numeric Strings, Handles) from card DOM
+     * Extract product identifiers
      */
     async function extractProductIdentifiers(card) {
       const identifiers = new Set();
 
-      // 1. Check direct dataset attributes for numeric IDs
       if (card.dataset.productId) identifiers.add(card.dataset.productId);
       if (card.dataset.id && /^\d+$/.test(card.dataset.id)) identifiers.add(card.dataset.id);
 
-      // 2. Query internal element data attributes
       const dataEl = card.querySelector("[data-product-id], [data-id]");
       if (dataEl) {
         if (dataEl.dataset.productId) identifiers.add(dataEl.dataset.productId);
         if (dataEl.dataset.id && /^\d+$/.test(dataEl.dataset.id)) identifiers.add(dataEl.dataset.id);
       }
 
-      // 3. Check form hidden inputs (Quick View / Add To Cart forms inside cards)
       const inputEl = card.querySelector('input[name="id"], input[name="product-id"]');
       if (inputEl && inputEl.value) identifiers.add(inputEl.value);
 
-      // 4. Check embedded JSON data
       const jsonScript = card.querySelector('script[type="application/json"]');
       if (jsonScript) {
         try {
@@ -130,16 +119,15 @@
         } catch (e) {}
       }
 
-      // 5. Product URL & API Fallback: If no numeric ID found, fetch numeric ID via Shopify product endpoint
       const link = card.querySelector('a[href*="/products/"]');
       if (link) {
         const href = link.getAttribute("href");
         const match = href.match(/\/products\/([^/?#]+)/);
         if (match && match[1]) {
           const handle = match[1];
-          identifiers.add(handle); // add handle as identifier
+          identifiers.add(handle);
 
-          if (identifiers.size === 1) { // If handle is the only identifier, fetch numeric ID
+          if (identifiers.size === 1) {
             try {
               const res = await fetch(`/products/${handle}.js`);
               if (res.ok) {
@@ -159,9 +147,6 @@
     }
 
 
-    /*
-     * Normalize Shopify Product IDs (Strips GIDs or non-digit characters down to clean numeric string).
-     */
     function normalizeProductId(id) {
       if (!id) return null;
       const value = String(id);
@@ -187,20 +172,13 @@
           })
         });
       } catch (e) {
-        console.error(
-          "Tracking Error:",
-          e
-        );
+        console.error("Tracking Error:", e);
       }
     }
 
 
     function injectBadge(card, badge) {
-      if (
-        card.querySelector(
-          `[data-badge-id="${badge.id}"]`
-        )
-      ) {
+      if (card.querySelector(`[data-badge-id="${badge.id}"]`)) {
         return;
       }
 
@@ -211,72 +189,33 @@
 
       media.style.position = "relative";
 
-      const badgeEl =
-        document.createElement("div");
+      const badgeEl = document.createElement("div");
+      badgeEl.className = "fs-custom-badge-rendered";
+      badgeEl.setAttribute("data-badge-id", badge.id);
 
-      badgeEl.className =
-        "fs-custom-badge-rendered";
+      const iconSpan = badge.icon ? `<span>${badge.icon}</span> ` : "";
+      badgeEl.innerHTML = `${iconSpan}<span>${badge.text}</span>`;
 
-      badgeEl.setAttribute(
-        "data-badge-id",
-        badge.id
-      );
+      let posStyle = "top: 10px; left: 10px;";
 
-      const iconSpan = badge.icon
-        ? `<span>${badge.icon}</span> `
-        : "";
-
-      badgeEl.innerHTML =
-        `${iconSpan}<span>${badge.text}</span>`;
-
-
-      let posStyle =
-        "top: 10px; left: 10px;";
-
-      if (badge.position === "top-right") {
-        posStyle =
-          "top: 10px; right: 10px;";
-      }
-
-      if (badge.position === "bottom-left") {
-        posStyle =
-          "bottom: 10px; left: 10px;";
-      }
-
-      if (badge.position === "bottom-right") {
-        posStyle =
-          "bottom: 10px; right: 10px;";
-      }
-
-      if (badge.position === "overlay") {
-        posStyle =
-          "top: 50%; left: 50%; transform: translate(-50%, -50%);";
-      }
-
+      if (badge.position === "top-right") posStyle = "top: 10px; right: 10px;";
+      if (badge.position === "bottom-left") posStyle = "bottom: 10px; left: 10px;";
+      if (badge.position === "bottom-right") posStyle = "bottom: 10px; right: 10px;";
+      if (badge.position === "overlay") posStyle = "top: 50%; left: 50%; transform: translate(-50%, -50%);";
 
       let borderRadius = "20px";
       let borderStyle = "none";
       let bgStyle = badge.bgColor;
       let textStyle = badge.textColor;
 
-
-      if (badge.shape === "sharp") {
-        borderRadius = "0px";
-      }
-
-      if (badge.shape === "ribbon") {
-        borderRadius = "0 8px 8px 0";
-      }
-
+      if (badge.shape === "sharp") borderRadius = "0px";
+      if (badge.shape === "ribbon") borderRadius = "0 8px 8px 0";
       if (badge.shape === "outline") {
         borderRadius = "6px";
-        borderStyle =
-          `2px solid ${badge.bgColor}`;
-
+        borderStyle = `2px solid ${badge.bgColor}`;
         bgStyle = "transparent";
         textStyle = badge.bgColor;
       }
-
 
       badgeEl.style.cssText = `
         position: absolute;
@@ -290,11 +229,7 @@
         letter-spacing: 0.5px;
         text-transform: uppercase;
         z-index: 30;
-        box-shadow: ${
-          badge.shape === "outline"
-            ? "none"
-            : "0 4px 8px rgba(0,0,0,0.2)"
-        };
+        box-shadow: ${badge.shape === "outline" ? "none" : "0 4px 8px rgba(0,0,0,0.2)"};
         pointer-events: auto;
         display: inline-flex;
         align-items: center;
@@ -303,35 +238,22 @@
         ${posStyle}
       `;
 
-
       media.appendChild(badgeEl);
 
-      trackEvent(
-        badge.id,
-        "impression"
-      );
-
+      trackEvent(badge.id, "impression");
 
       card.addEventListener(
         "click",
         function() {
-          trackEvent(
-            badge.id,
-            "click"
-          );
+          trackEvent(badge.id, "click");
         },
         { once: true }
       );
     }
 
 
-    if (
-      document.readyState === "loading"
-    ) {
-      document.addEventListener(
-        "DOMContentLoaded",
-        loadBadges
-      );
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", loadBadges);
     } else {
       loadBadges();
     }
