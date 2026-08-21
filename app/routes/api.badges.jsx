@@ -1,13 +1,25 @@
 import { json } from "@remix-run/node";
 import db from "../db.server.js";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Cache-Control": "no-store",
+};
+
+// CORS Preflight
+export const options = async () => {
+  return new Response(null, { status: 204, headers: corsHeaders });
+};
+
 // GET: Fetch Active Badges for Storefront
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
   const shop = url.searchParams.get("shop");
 
   if (!shop) {
-    return json({ error: "Missing shop parameter" }, { status: 400 });
+    return json({ error: "Missing shop parameter" }, { status: 400, headers: corsHeaders });
   }
 
   try {
@@ -29,28 +41,24 @@ export const loader = async ({ request }) => {
       productIds: b.products.map((p) => p.productId),
     }));
 
-    return json(
-      { badges: responseBadges },
-      {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Cache-Control": "no-store",
-        },
-      }
-    );
+    return json({ badges: responseBadges }, { headers: corsHeaders });
   } catch (error) {
-    return json({ error: error.message }, { status: 500 });
+    return json({ error: error.message }, { status: 500, headers: corsHeaders });
   }
 };
 
 // POST: Track Impressions & Clicks Realtime
 export const action = async ({ request }) => {
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
   try {
     const body = await request.json();
     const { badgeId, type } = body;
 
     if (!badgeId || !type) {
-      return json({ error: "Missing tracking data" }, { status: 400 });
+      return json({ error: "Missing tracking data" }, { status: 400, headers: corsHeaders });
     }
 
     if (type === "impression") {
@@ -65,11 +73,8 @@ export const action = async ({ request }) => {
       });
     }
 
-    return json(
-      { success: true },
-      { headers: { "Access-Control-Allow-Origin": "*" } }
-    );
+    return json({ success: true }, { headers: corsHeaders });
   } catch (error) {
-    return json({ error: error.message }, { status: 500 });
+    return json({ error: error.message }, { status: 500, headers: corsHeaders });
   }
 };

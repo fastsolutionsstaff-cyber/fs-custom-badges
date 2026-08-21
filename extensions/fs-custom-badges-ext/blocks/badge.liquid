@@ -5,7 +5,6 @@
     async function loadBadges() {
       try {
         const shop = "{{ shop.permanent_domain }}";
-        
         const response = await fetch(`/apps/badges/api/badges?shop=${shop}`);
         
         const contentType = response.headers.get("content-type");
@@ -20,8 +19,12 @@
         const cards = document.querySelectorAll('.card-wrapper, .card, .grid__item, product-card, .product-card');
 
         cards.forEach((card) => {
+          const cardProductId = extractProductId(card);
+
           data.badges.forEach((badge) => {
-            if (badge.isGlobal) {
+            const isTargeted = badge.productIds && cardProductId && badge.productIds.some(id => id.includes(cardProductId));
+            
+            if (badge.isGlobal || isTargeted) {
               injectBadge(card, badge);
             }
           });
@@ -30,6 +33,19 @@
       } catch (err) {
         console.error("❌ [Custom Badges] Fetch error:", err);
       }
+    }
+
+    function extractProductId(card) {
+      if (card.dataset.productId) return card.dataset.productId;
+      
+      const link = card.querySelector('a[href*="/products/"]');
+      if (link) {
+        const href = link.getAttribute('href');
+        const match = href.match(/\/products\/([a-zA-Z0-9\-_]+)/);
+        if (match) return match[1];
+      }
+      
+      return null;
     }
 
     function trackEvent(badgeId, type) {
@@ -100,10 +116,8 @@
 
       media.appendChild(badgeEl);
 
-      // 1. Track Impression
       trackEvent(badge.id, 'impression');
 
-      // 2. Track Click
       card.addEventListener('click', function() {
         trackEvent(badge.id, 'click');
       }, { once: true });
