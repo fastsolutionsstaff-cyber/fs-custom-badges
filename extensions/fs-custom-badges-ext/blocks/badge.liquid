@@ -5,25 +5,53 @@
     async function loadBadges() {
       try {
         const shop = "{{ shop.permanent_domain }}";
-        const response = await fetch(`/apps/badges/api/badges?shop=${shop}`);
-        
+
+        /*
+         * IMPORTANT:
+         * /apps/badges is the Shopify App Proxy URL.
+         * Your app.toml already maps this to:
+         * https://fs-custom-badges.vercel.app/api/badges
+         */
+        const response = await fetch(`/apps/badges?shop=${encodeURIComponent(shop)}`);
+
         const contentType = response.headers.get("content-type");
+
         if (!response.ok || !contentType || !contentType.includes("application/json")) {
-          console.warn("⚠️ [Custom Badges]: App Proxy non-JSON response.");
+          console.warn(
+            "⚠️ [Custom Badges]: App Proxy returned a non-JSON response.",
+            response.status
+          );
           return;
         }
 
         const data = await response.json();
-        if (!data.badges || data.badges.length === 0) return;
 
-        const cards = document.querySelectorAll('.card-wrapper, .card, .grid__item, product-card, .product-card');
+        console.log("✅ [Custom Badges]: API response:", data);
+
+        if (!data.badges || data.badges.length === 0) {
+          console.log("ℹ️ [Custom Badges]: No active badges found.");
+          return;
+        }
+
+        const cards = document.querySelectorAll(
+          '.card-wrapper, .card, .grid__item, product-card, .product-card'
+        );
+
+        console.log(
+          `🔎 [Custom Badges]: Found ${cards.length} product cards.`
+        );
 
         cards.forEach((card) => {
           const cardProductId = extractProductId(card);
 
           data.badges.forEach((badge) => {
-            const isTargeted = badge.productIds && cardProductId && badge.productIds.some(id => id.includes(cardProductId));
-            
+            const isTargeted =
+              badge.productIds &&
+              cardProductId &&
+              badge.productIds.some((id) =>
+                id.includes(cardProductId)
+              );
+
             if (badge.isGlobal || isTargeted) {
               injectBadge(card, badge);
             }
@@ -36,24 +64,38 @@
     }
 
     function extractProductId(card) {
-      if (card.dataset.productId) return card.dataset.productId;
-      
-      const link = card.querySelector('a[href*="/products/"]');
-      if (link) {
-        const href = link.getAttribute('href');
-        const match = href.match(/\/products\/([a-zA-Z0-9\-_]+)/);
-        if (match) return match[1];
+      if (card.dataset.productId) {
+        return card.dataset.productId;
       }
-      
+
+      const link = card.querySelector('a[href*="/products/"]');
+
+      if (link) {
+        const href = link.getAttribute("href");
+
+        const match = href.match(
+          /\/products\/([a-zA-Z0-9\-_]+)/
+        );
+
+        if (match) {
+          return match[1];
+        }
+      }
+
       return null;
     }
 
     function trackEvent(badgeId, type) {
       try {
-        fetch('/apps/badges/api/badges', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ badgeId, type }),
+        fetch("/apps/badges", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            badgeId,
+            type
+          })
         });
       } catch (e) {
         console.error("Tracking Error:", e);
@@ -61,35 +103,78 @@
     }
 
     function injectBadge(card, badge) {
-      if (card.querySelector(`[data-badge-id="${badge.id}"]`)) return;
+      if (
+        card.querySelector(
+          `[data-badge-id="${badge.id}"]`
+        )
+      ) {
+        return;
+      }
 
-      const media = card.querySelector('.card__media') || card.querySelector('.media') || card;
-      media.style.position = 'relative';
+      const media =
+        card.querySelector(".card__media") ||
+        card.querySelector(".media") ||
+        card;
 
-      const badgeEl = document.createElement('div');
-      badgeEl.className = 'fs-custom-badge-rendered';
-      badgeEl.setAttribute('data-badge-id', badge.id);
-      
-      const iconSpan = badge.icon ? `<span>${badge.icon}</span> ` : '';
-      badgeEl.innerHTML = `${iconSpan}<span>${badge.text}</span>`;
-      
-      let posStyle = 'top: 10px; left: 10px;';
-      if (badge.position === 'top-right') posStyle = 'top: 10px; right: 10px;';
-      if (badge.position === 'bottom-left') posStyle = 'bottom: 10px; left: 10px;';
-      if (badge.position === 'bottom-right') posStyle = 'bottom: 10px; right: 10px;';
-      if (badge.position === 'overlay') posStyle = 'top: 50%; left: 50%; transform: translate(-50%, -50%);';
+      media.style.position = "relative";
 
-      let borderRadius = '20px';
-      let borderStyle = 'none';
+      const badgeEl = document.createElement("div");
+
+      badgeEl.className = "fs-custom-badge-rendered";
+
+      badgeEl.setAttribute(
+        "data-badge-id",
+        badge.id
+      );
+
+      const iconSpan = badge.icon
+        ? `<span>${badge.icon}</span> `
+        : "";
+
+      badgeEl.innerHTML =
+        `${iconSpan}<span>${badge.text}</span>`;
+
+      let posStyle =
+        "top: 10px; left: 10px;";
+
+      if (badge.position === "top-right") {
+        posStyle =
+          "top: 10px; right: 10px;";
+      }
+
+      if (badge.position === "bottom-left") {
+        posStyle =
+          "bottom: 10px; left: 10px;";
+      }
+
+      if (badge.position === "bottom-right") {
+        posStyle =
+          "bottom: 10px; right: 10px;";
+      }
+
+      if (badge.position === "overlay") {
+        posStyle =
+          "top: 50%; left: 50%; transform: translate(-50%, -50%);";
+      }
+
+      let borderRadius = "20px";
+      let borderStyle = "none";
       let bgStyle = badge.bgColor;
       let textStyle = badge.textColor;
 
-      if (badge.shape === 'sharp') borderRadius = '0px';
-      if (badge.shape === 'ribbon') borderRadius = '0 8px 8px 0';
-      if (badge.shape === 'outline') {
-        borderRadius = '6px';
-        borderStyle = `2px solid ${badge.bgColor}`;
-        bgStyle = 'transparent';
+      if (badge.shape === "sharp") {
+        borderRadius = "0px";
+      }
+
+      if (badge.shape === "ribbon") {
+        borderRadius = "0 8px 8px 0";
+      }
+
+      if (badge.shape === "outline") {
+        borderRadius = "6px";
+        borderStyle =
+          `2px solid ${badge.bgColor}`;
+        bgStyle = "transparent";
         textStyle = badge.bgColor;
       }
 
@@ -105,7 +190,11 @@
         letter-spacing: 0.5px;
         text-transform: uppercase;
         z-index: 30;
-        box-shadow: ${badge.shape === 'outline' ? 'none' : '0 4px 8px rgba(0,0,0,0.2)'};
+        box-shadow: ${
+          badge.shape === "outline"
+            ? "none"
+            : "0 4px 8px rgba(0,0,0,0.2)"
+        };
         pointer-events: auto;
         display: inline-flex;
         align-items: center;
@@ -116,15 +205,30 @@
 
       media.appendChild(badgeEl);
 
-      trackEvent(badge.id, 'impression');
+      trackEvent(
+        badge.id,
+        "impression"
+      );
 
-      card.addEventListener('click', function() {
-        trackEvent(badge.id, 'click');
-      }, { once: true });
+      card.addEventListener(
+        "click",
+        function() {
+          trackEvent(
+            badge.id,
+            "click"
+          );
+        },
+        { once: true }
+      );
     }
 
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', loadBadges);
+    if (
+      document.readyState === "loading"
+    ) {
+      document.addEventListener(
+        "DOMContentLoaded",
+        loadBadges
+      );
     } else {
       loadBadges();
     }
