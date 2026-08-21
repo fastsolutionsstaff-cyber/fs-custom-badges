@@ -41,8 +41,9 @@
           `🔎 [Custom Badges]: Found ${cards.length} product cards.`
         );
 
-        cards.forEach((card) => {
-          const cardIdentifiers = extractProductIdentifiers(card);
+        // Async loop to resolve API fallbacks for product cards sequentially
+        for (const card of cards) {
+          const cardIdentifiers = await extractProductIdentifiers(card);
 
           console.log(
             "🛍️ Product card Identifiers:",
@@ -87,7 +88,7 @@
               injectBadge(card, badge);
             }
           });
-        });
+        }
 
       } catch (err) {
         console.error(
@@ -99,22 +100,20 @@
 
 
     /*
-     * Extract all possible product identifiers (IDs, Handles) from card DOM
+     * Extract all possible product identifiers (IDs, Numeric Strings, Handles) from card DOM
      */
-    function extractProductIdentifiers(card) {
+    async function extractProductIdentifiers(card) {
       const identifiers = new Set();
 
-      // 1. Direct dataset attributes
+      // 1. Check direct dataset attributes for numeric IDs
       if (card.dataset.productId) identifiers.add(card.dataset.productId);
-      if (card.dataset.id) identifiers.add(card.dataset.id);
-      if (card.dataset.productHandle) identifiers.add(card.dataset.productHandle);
+      if (card.dataset.id && /^\d+$/.test(card.dataset.id)) identifiers.add(card.dataset.id);
 
       // 2. Query internal element data attributes
-      const dataEl = card.querySelector("[data-product-id], [data-id], [data-product-handle]");
+      const dataEl = card.querySelector("[data-product-id], [data-id]");
       if (dataEl) {
         if (dataEl.dataset.productId) identifiers.add(dataEl.dataset.productId);
-        if (dataEl.dataset.id) identifiers.add(dataEl.dataset.id);
-        if (dataEl.dataset.productHandle) identifiers.add(dataEl.dataset.productHandle);
+        if (dataEl.dataset.id && /^\d+$/.test(dataEl.dataset.id)) identifiers.add(dataEl.dataset.id);
       }
 
       // 3. Check form hidden inputs (Quick View / Add To Cart forms inside cards)
@@ -128,17 +127,31 @@
           const parsed = JSON.parse(jsonScript.textContent);
           if (parsed.id) identifiers.add(String(parsed.id));
           if (parsed.product_id) identifiers.add(String(parsed.product_id));
-          if (parsed.handle) identifiers.add(parsed.handle);
         } catch (e) {}
       }
 
-      // 5. Fallback to product anchor href handle parsing
+      // 5. Product URL & API Fallback: If no numeric ID found, fetch numeric ID via Shopify product endpoint
       const link = card.querySelector('a[href*="/products/"]');
       if (link) {
         const href = link.getAttribute("href");
         const match = href.match(/\/products\/([^/?#]+)/);
         if (match && match[1]) {
-          identifiers.add(match[1]);
+          const handle = match[1];
+          identifiers.add(handle); // add handle as identifier
+
+          if (identifiers.size === 1) { // If handle is the only identifier, fetch numeric ID
+            try {
+              const res = await fetch(`/products/${handle}.js`);
+              if (res.ok) {
+                const prodJson = await res.json();
+                if (prodJson.id) {
+                  identifiers.add(String(prodJson.id));
+                }
+              }
+            } catch (e) {
+              console.warn("Could not fetch product JS endpoint for handle:", handle);
+            }
+          }
         }
       }
 
@@ -147,14 +160,15 @@
 
 
     /*
-     * Normalize Product IDs (Strips GIDs to clean digits)
+     * Normalize Shopify Product IDs (Strips GIDs or non-digit characters down to clean numeric string).
      */
     function normalizeProductId(id) {
       if (!id) return null;
       const value = String(id);
+      
       const gidMatch = value.match(/gid:\/\/shopify\/Product\/(\d+)/);
       if (gidMatch) return gidMatch[1];
-      
+
       const numbersOnly = value.replace(/\D/g, "");
       return numbersOnly || value;
     }
