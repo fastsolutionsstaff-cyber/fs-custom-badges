@@ -2,10 +2,6 @@
   (function () {
     "use strict";
 
-    if (window.location.pathname.includes("/products/")) {
-      return;
-    }
-
     // App Proxy Endpoint
     const API_ENDPOINT = "/apps/badges";
     const SHOP_DOMAIN = "{{ shop.permanent_domain }}";
@@ -28,12 +24,12 @@
         );
 
         if (!response.ok) {
-          console.warn("[FS Custom Badges] Badges load nahi ho sakay. HTTP Status:", response.status);
+          console.warn("[FS Custom Badges] Badges load nahi ho sakay. Status:", response.status);
           return false;
         }
 
         const data = await response.json();
-        console.log("[FS Custom Badges] API Response received successfully:", data);
+        console.log("[FS Custom Badges] API Response received:", data);
 
         badgeConfiguration = Array.isArray(data.badges) ? data.badges : [];
 
@@ -49,7 +45,7 @@
 
         return true;
       } catch (error) {
-        console.error("[FS Custom Badges] App Proxy load karne me masla aaya (Tunnel/URL issue ho sakta hai):", error);
+        console.error("[FS Custom Badges] Proxy load error:", error);
         return false;
       }
     }
@@ -62,7 +58,9 @@
         "product-card",
         ".grid__item .card",
         ".grid__item",
-        "[data-product-id]"
+        "[data-product-id]",
+        ".product__media-wrapper", // PDP Specific Support
+        ".product-single__photos"   // PDP Support
       ];
 
       const cards = new Set();
@@ -110,10 +108,12 @@
       let productId = null;
       let productHandle = null;
 
+      // 1. Check card dataset
       if (card.dataset.productId) {
         productId = normalizeProductId(card.dataset.productId);
       }
 
+      // 2. Extract from links (Collection Cards)
       const productLink = card.querySelector('a[href*="/products/"]');
       if (productLink) {
         const href = productLink.getAttribute("href") || "";
@@ -127,12 +127,19 @@
         }
       }
 
+      // 3. Fallback for Product Details Page (PDP)
+      if (!productHandle && window.location.pathname.includes("/products/")) {
+        const pdpMatch = window.location.pathname.match(/\/products\/([^/?#]+)/i);
+        if (pdpMatch) productHandle = pdpMatch[1];
+      }
+
+      // 4. Try extract numeric IDs inside card attributes
       if (!productId) {
-        const possibleIdElements = ["[data-product-id]", "[data-product]", "[data-product-handle]"];
+        const possibleIdElements = ["[data-product-id]", "[data-product]", "[data-product-handle]", "[id*='CardArticle-']"];
         for (const selector of possibleIdElements) {
           const element = card.querySelector(selector);
           if (!element) continue;
-          const possibleId = element.dataset.productId || element.dataset.product;
+          const possibleId = element.dataset.productId || element.dataset.product || element.id;
           if (possibleId) {
             productId = normalizeProductId(possibleId);
             if (productId) break;
@@ -172,6 +179,7 @@
     }
 
     function isEligible(badge, productData) {
+      // Allow if active
       if (badge.enabled === false || badge.isActive === false || badge.status === "INACTIVE") {
         return false;
       }
@@ -180,11 +188,22 @@
 
       const targetType = badge.targetType || (badge.isGlobal ? "GLOBAL" : "GLOBAL");
 
+      // Global Badge
       if (targetType === "GLOBAL") return true;
 
+      // Specific Products Match
       if (targetType === "SPECIFIC_PRODUCTS") {
-        if (!productData.productId || !Array.isArray(badge.productIds)) return false;
-        return badge.productIds.some((id) => normalizeProductId(id) === productData.productId);
+        if (!Array.isArray(badge.productIds) && !Array.isArray(badge.productHandles)) return false;
+        
+        // Match by ID
+        const matchesId = productData.productId && Array.isArray(badge.productIds) && 
+          badge.productIds.some((id) => normalizeProductId(id) === productData.productId);
+
+        // Match by Handle
+        const matchesHandle = productData.productHandle && Array.isArray(badge.productHandles) &&
+          badge.productHandles.some((h) => String(h).toLowerCase() === String(productData.productHandle).toLowerCase());
+
+        return matchesId || matchesHandle;
       }
 
       if (targetType === "PRODUCT_TAGS") {
@@ -215,6 +234,7 @@
         card.querySelector(".media") ||
         card.querySelector(".product-card__image-wrapper") ||
         card.querySelector(".card__inner") ||
+        card.querySelector(".product__media-list") ||
         card
       );
     }
@@ -275,13 +295,13 @@
         align-items: center;
         justify-content: center;
         gap: 5px;
-        padding: ${badge.paddingY || 4}px ${badge.paddingX || 10}px;
+        padding: ${badge.paddingY || 6}px ${badge.paddingX || 12}px;
         min-height: 20px;
         background: ${isOutline ? "transparent" : isGlass ? `${bgColor}CC` : bgColor};
         color: ${isOutline ? bgColor : textColor};
         border: ${isOutline ? `1.5px solid ${bgColor}` : `1px solid ${borderColor}`};
         border-radius: ${radius};
-        font-size: ${badge.fontSize || 11}px;
+        font-size: ${badge.fontSize || 12}px;
         font-weight: ${badge.fontWeight || "700"};
         line-height: 1.2;
         letter-spacing: 0.2px;
@@ -291,7 +311,7 @@
         box-sizing: border-box;
         pointer-events: auto;
         cursor: pointer;
-        box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+        box-shadow: 0 3px 10px rgba(0,0,0,0.15);
         ${isGlass ? "backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);" : ""}
         ${badge.customCss ? badge.customCss : ""}
       `;
@@ -335,7 +355,6 @@
 
       cards.forEach((card) => {
         const productData = getProductData(card);
-        if (!productData.productId && !productData.productHandle) return;
 
         removeExistingBadges(card);
 
