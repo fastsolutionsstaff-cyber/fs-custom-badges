@@ -24,14 +24,13 @@
     --label-letter-spacing: {{ block.settings.letter_spacing }}px;
   "
 >
-  {% if request.design_mode %}
-    <span class="fs-pdp-badge fs-shape-{{ block.settings.badge_shape }}">
-      {% if block.settings.show_icon and block.settings.default_icon != blank %}
-        <span class="fs-badge-icon">{{ block.settings.default_icon }}</span>
-      {% endif %}
-      <span class="fs-badge-text">{{ block.settings.preview_text | default: "⚡ LIMITED STOCK" }}</span>
-    </span>
-  {% endif %}
+  {%- comment -%} Show fallback badge on both Theme Editor and Live Storefront until API loads {%- endcomment -%}
+  <span class="fs-pdp-badge fs-shape-{{ block.settings.badge_shape }}">
+    {% if block.settings.show_icon and block.settings.default_icon != blank %}
+      <span class="fs-badge-icon">{{ block.settings.default_icon }}</span>
+    {% endif %}
+    <span class="fs-badge-text">{{ block.settings.preview_text | default: "⚡ LIMITED STOCK" }}</span>
+  </span>
 </div>
 
 <style>
@@ -139,7 +138,10 @@
     async function fetchPDPLabel() {
       try {
         const response = await fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(shop)}`);
-        if (!response.ok) return;
+        if (!response.ok) {
+          console.warn("[PDP Label] App Proxy server response error:", response.status);
+          return;
+        }
 
         const data = await response.json();
         if (!data.badges || data.badges.length === 0) return;
@@ -167,23 +169,22 @@
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ badgeId: matchingBadge.id, eventType: 'CLICK', productId }),
-            });
+            }).catch(() => {});
           });
 
           fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(shop)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ badgeId: matchingBadge.id, eventType: 'IMPRESSION', productId }),
-          });
+          }).catch(() => {});
         }
       } catch (err) {
-        console.error("PDP Label Fetch Error:", err);
+        console.error("[PDP Label] API Sync failed, showing theme block default:", err);
       }
     }
 
-    if (!window.Shopify || !window.Shopify.designMode) {
-      fetchPDPLabel();
-    }
+    // Always attempt to fetch API for live badge overrides
+    fetchPDPLabel();
   })();
 </script>
 {% endif %}
@@ -287,12 +288,12 @@
     },
     {
       "type": "header",
-      "content": "👁️ Theme Editor Preview"
+      "content": "👁️ Badge Preview Text"
     },
     {
       "type": "text",
       "id": "preview_text",
-      "label": "Preview Text (Editor Only)",
+      "label": "Default/Fallback Text",
       "default": "⚡ LIMITED STOCK"
     }
   ]

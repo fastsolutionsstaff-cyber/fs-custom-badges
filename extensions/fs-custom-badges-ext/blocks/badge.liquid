@@ -6,6 +6,7 @@
       return;
     }
 
+    // App Proxy Endpoint
     const API_ENDPOINT = "/apps/badges";
     const SHOP_DOMAIN = "{{ shop.permanent_domain }}";
 
@@ -18,14 +19,22 @@
           `${API_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`,
           {
             method: "GET",
+            headers: {
+              "Accept": "application/json"
+            },
             credentials: "same-origin",
             cache: "no-store"
           }
         );
 
-        if (!response.ok) return false;
+        if (!response.ok) {
+          console.warn("[FS Custom Badges] Badges load nahi ho sakay. HTTP Status:", response.status);
+          return false;
+        }
 
         const data = await response.json();
+        console.log("[FS Custom Badges] API Response received successfully:", data);
+
         badgeConfiguration = Array.isArray(data.badges) ? data.badges : [];
 
         if (
@@ -40,7 +49,7 @@
 
         return true;
       } catch (error) {
-        console.error("[FS Custom Badges] Failed to load badges:", error);
+        console.error("[FS Custom Badges] App Proxy load karne me masla aaya (Tunnel/URL issue ho sakta hai):", error);
         return false;
       }
     }
