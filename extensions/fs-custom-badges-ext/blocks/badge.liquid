@@ -1,270 +1,163 @@
 <script>
-  (function() {
-    // 🛑 STOP EXECUTION ON PRODUCT DETAIL PAGES (PDP)
-    // PDP page par sirf humara Naya Product Label Block kaam karega
-    if (window.location.pathname.includes('/products/')) {
-      return;
-    }
+  (function () {
+    // PDP page par App Block kaam karega, isliye PDP script bypass
+    if (window.location.pathname.includes('/products/')) return;
 
-    console.log("👉 [Custom Badges]: App Embed Loaded (Collection Cards)");
+    const API_ENDPOINT = '/apps/badges';
 
-    async function loadBadges() {
+    async function initBadgeEngine() {
       try {
         const shop = "{{ shop.permanent_domain }}";
+        const res = await fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(shop)}`);
+        if (!res.ok) return;
 
-        const response = await fetch(
-          `/apps/badges?shop=${encodeURIComponent(shop)}`
-        );
+        const { badges, globalCustomCss } = await res.json();
+        if (!badges || badges.length === 0) return;
 
-        const contentType = response.headers.get("content-type");
-
-        if (
-          !response.ok ||
-          !contentType ||
-          !contentType.includes("application/json")
-        ) {
-          console.warn(
-            "⚠️ [Custom Badges]: App Proxy non-JSON response.",
-            response.status
-          );
-          return;
+        if (globalCustomCss) {
+          const styleTag = document.createElement('style');
+          styleTag.innerHTML = globalCustomCss;
+          document.head.appendChild(styleTag);
         }
 
-        const data = await response.json();
-
-        console.log("✅ [Custom Badges]: API response:", data);
-
-        if (!data.badges || data.badges.length === 0) {
-          console.log("ℹ️ [Custom Badges]: No active badges found.");
-          return;
-        }
-
-        const cards = document.querySelectorAll(
-          ".card-wrapper, .card, .grid__item, product-card, .product-card, .product-item, [data-product-id]"
+        const productCards = document.querySelectorAll(
+          '.card-wrapper, .card, .grid__item, product-card, .product-card, [data-product-id]'
         );
 
-        console.log(
-          `🔎 [Custom Badges]: Found ${cards.length} product cards.`
-        );
+        productCards.forEach((card) => {
+          const productId = getProductId(card);
+          const tags = card.dataset.tags ? card.dataset.tags.toLowerCase().split(',').map(t => t.trim()) : [];
+          const price = parseFloat(card.dataset.price || '0');
+          const inventory = parseInt(card.dataset.inventory || '999', 10);
 
-        for (const card of cards) {
-          const cardIdentifiers = await extractProductIdentifiers(card);
-
-          data.badges.forEach((badge) => {
-            /*
-             * GLOBAL BADGE
-             */
-            if (badge.isGlobal) {
-              injectBadge(card, badge);
-              return;
-            }
-
-            /*
-             * SPECIFIC PRODUCT BADGE
-             */
-            if (!cardIdentifiers.length || !badge.productIds || badge.productIds.length === 0) {
-              return;
-            }
-
-            const isTargeted = badge.productIds.some((targetId) => {
-              const cleanTarget = normalizeProductId(targetId);
-              return cardIdentifiers.some((cardId) => {
-                const cleanCardId = normalizeProductId(cardId);
-                return (
-                  cardId === targetId ||
-                  (cleanTarget && cleanCardId && cleanTarget === cleanCardId)
-                );
-              });
-            });
-
-            if (isTargeted) {
-              injectBadge(card, badge);
-            }
-          });
-        }
-
-      } catch (err) {
-        console.error(
-          "❌ [Custom Badges] Fetch error:",
-          err
-        );
-      }
-    }
-
-
-    /*
-     * Extract product identifiers
-     */
-    async function extractProductIdentifiers(card) {
-      const identifiers = new Set();
-
-      if (card.dataset.productId) identifiers.add(card.dataset.productId);
-      if (card.dataset.id && /^\d+$/.test(card.dataset.id)) identifiers.add(card.dataset.id);
-
-      const dataEl = card.querySelector("[data-product-id], [data-id]");
-      if (dataEl) {
-        if (dataEl.dataset.productId) identifiers.add(dataEl.dataset.productId);
-        if (dataEl.dataset.id && /^\d+$/.test(dataEl.dataset.id)) identifiers.add(dataEl.dataset.id);
-      }
-
-      const inputEl = card.querySelector('input[name="id"], input[name="product-id"]');
-      if (inputEl && inputEl.value) identifiers.add(inputEl.value);
-
-      const jsonScript = card.querySelector('script[type="application/json"]');
-      if (jsonScript) {
-        try {
-          const parsed = JSON.parse(jsonScript.textContent);
-          if (parsed.id) identifiers.add(String(parsed.id));
-          if (parsed.product_id) identifiers.add(String(parsed.product_id));
-        } catch (e) {}
-      }
-
-      const link = card.querySelector('a[href*="/products/"]');
-      if (link) {
-        const href = link.getAttribute("href");
-        const match = href.match(/\/products\/([^/?#]+)/);
-        if (match && match[1]) {
-          const handle = match[1];
-          identifiers.add(handle);
-
-          if (identifiers.size === 1) {
-            try {
-              const res = await fetch(`/products/${handle}.js`);
-              if (res.ok) {
-                const prodJson = await res.json();
-                if (prodJson.id) {
-                  identifiers.add(String(prodJson.id));
-                }
-              }
-            } catch (e) {
-              console.warn("Could not fetch product JS endpoint for handle:", handle);
+          for (const badge of badges) {
+            if (isEligible(badge, productId, tags, price, inventory)) {
+              renderBadgeOnCard(card, badge);
+              break; // Top priority badge applied
             }
           }
-        }
-      }
-
-      return Array.from(identifiers);
-    }
-
-
-    function normalizeProductId(id) {
-      if (!id) return null;
-      const value = String(id);
-      
-      const gidMatch = value.match(/gid:\/\/shopify\/Product\/(\d+)/);
-      if (gidMatch) return gidMatch[1];
-
-      const numbersOnly = value.replace(/\D/g, "");
-      return numbersOnly || value;
-    }
-
-
-    function trackEvent(badgeId, type) {
-      try {
-        fetch("/apps/badges", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            badgeId,
-            type
-          })
         });
-      } catch (e) {
-        console.error("Tracking Error:", e);
+      } catch (err) {
+        console.error("Badge Engine Error:", err);
       }
     }
 
+    function getProductId(card) {
+      if (card.dataset.productId) return String(card.dataset.productId).replace(/\D/g, '');
+      const anchor = card.querySelector('a[href*="/products/"]');
+      if (anchor) {
+        const match = anchor.href.match(/products\/([^/?#]+)/);
+        if (match) return match[1];
+      }
+      return null;
+    }
 
-    function injectBadge(card, badge) {
-      if (card.querySelector(`[data-badge-id="${badge.id}"]`)) {
-        return;
+    function isEligible(badge, productId, tags, price, inventory) {
+      if (badge.isActive === false) return false;
+
+      const targetType = badge.targetType || (badge.isGlobal ? 'GLOBAL' : '');
+      
+      if (targetType === 'GLOBAL') return true;
+
+      if (targetType === 'SPECIFIC_PRODUCTS' && productId && Array.isArray(badge.productIds)) {
+        return badge.productIds.some(id => String(id).replace(/\D/g, '') === String(productId));
       }
 
-      const media =
-        card.querySelector(".card__media") ||
-        card.querySelector(".media") ||
-        card;
-
-      media.style.position = "relative";
-
-      const badgeEl = document.createElement("div");
-      badgeEl.className = "fs-custom-badge-rendered";
-      badgeEl.setAttribute("data-badge-id", badge.id);
-
-      const iconSpan = badge.icon ? `<span>${badge.icon}</span> ` : "";
-      badgeEl.innerHTML = `${iconSpan}<span>${badge.text}</span>`;
-
-      let posStyle = "top: 10px; left: 10px;";
-
-      if (badge.position === "top-right") posStyle = "top: 10px; right: 10px;";
-      if (badge.position === "bottom-left") posStyle = "bottom: 10px; left: 10px;";
-      if (badge.position === "bottom-right") posStyle = "bottom: 10px; right: 10px;";
-      if (badge.position === "overlay") posStyle = "top: 50%; left: 50%; transform: translate(-50%, -50%);";
-
-      let borderRadius = "20px";
-      let borderStyle = "none";
-      let bgStyle = badge.bgColor;
-      let textStyle = badge.textColor;
-
-      if (badge.shape === "sharp") borderRadius = "0px";
-      if (badge.shape === "ribbon") borderRadius = "0 8px 8px 0";
-      if (badge.shape === "outline") {
-        borderRadius = "6px";
-        borderStyle = `2px solid ${badge.bgColor}`;
-        bgStyle = "transparent";
-        textStyle = badge.bgColor;
+      if (targetType === 'PRODUCT_TAGS' && Array.isArray(badge.targetTags)) {
+        const formattedTargetTags = badge.targetTags.map(t => String(t).toLowerCase().trim());
+        return tags.some(t => formattedTargetTags.includes(t));
       }
 
-      badgeEl.style.cssText = `
+      if (targetType === 'INVENTORY_LEVEL') {
+        const min = badge.minInventory ?? 0;
+        const max = badge.maxInventory ?? Infinity;
+        return inventory >= min && inventory <= max;
+      }
+
+      if (targetType === 'PRICE_RANGE') {
+        const min = badge.minPrice ?? 0;
+        const max = badge.maxPrice ?? Infinity;
+        return price >= min && price <= max;
+      }
+
+      return false;
+    }
+
+    function renderBadgeOnCard(card, badge) {
+      if (card.querySelector(`[data-badge-id="${badge.id}"]`)) return;
+
+      const mediaElement = card.querySelector('.card__media, .media, .product-card__image-wrapper') || card;
+      if (getComputedStyle(mediaElement).position === 'static') {
+        mediaElement.style.position = 'relative';
+      }
+
+      const el = document.createElement('div');
+      el.className = 'saas-engine-badge';
+      el.dataset.badgeId = badge.id;
+      el.innerHTML = `${badge.icon ? `<span class="fs-badge-icon">${badge.icon}</span> ` : ''}<span>${badge.text}</span>`;
+
+      let posStyles = 'top: 8px; left: 8px;';
+      if (badge.position === 'TOP_RIGHT') posStyles = 'top: 8px; right: 8px;';
+      if (badge.position === 'BOTTOM_LEFT') posStyles = 'bottom: 8px; left: 8px;';
+      if (badge.position === 'BOTTOM_RIGHT') posStyles = 'bottom: 8px; right: 8px;';
+
+      const isOutline = badge.shape === 'OUTLINE' || badge.shape === 'outline';
+      const isPill = badge.shape === 'PILL' || badge.shape === 'pill';
+      const isSharp = badge.shape === 'SHARP' || badge.shape === 'sharp';
+
+      const bgColor = badge.bgColor || '#111111';
+      const textColor = badge.textColor || '#FFFFFF';
+
+      el.style.cssText = `
         position: absolute;
-        background-color: ${bgStyle};
-        color: ${textStyle};
+        ${posStyles}
+        background-color: ${isOutline ? 'transparent' : bgColor};
+        color: ${isOutline ? bgColor : textColor};
+        border: ${isOutline ? `2px solid ${bgColor}` : `1px solid ${badge.borderColor || 'transparent'}`};
+        border-radius: ${isPill ? '50px' : isSharp ? '0px' : `${badge.borderRadius || 6}px`};
+        padding: ${badge.paddingY || 4}px ${badge.paddingX || 10}px;
         font-size: ${badge.fontSize || 11}px;
-        padding: 5px 12px;
-        border-radius: ${borderRadius};
-        border: ${borderStyle};
         font-weight: 700;
-        letter-spacing: 0.5px;
         text-transform: uppercase;
-        z-index: 30;
-        box-shadow: ${badge.shape === "outline" ? "none" : "0 4px 8px rgba(0,0,0,0.2)"};
-        pointer-events: auto;
+        z-index: 25;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        cursor: pointer;
+        line-height: 1.2;
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        line-height: 1;
-        ${posStyle}
+        ${badge.customCss || ''}
       `;
 
-      media.appendChild(badgeEl);
+      el.addEventListener('click', () => {
+        fetch(API_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ badgeId: badge.id, eventType: 'CLICK', productId }),
+        });
+      });
 
-      trackEvent(badge.id, "impression");
+      mediaElement.appendChild(el);
 
-      card.addEventListener(
-        "click",
-        function() {
-          trackEvent(badge.id, "click");
-        },
-        { once: true }
-      );
+      // Impression Track
+      fetch(API_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ badgeId: badge.id, eventType: 'IMPRESSION', productId }),
+      });
     }
 
-
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", loadBadges);
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initBadgeEngine);
     } else {
-      loadBadges();
+      initBadgeEngine();
     }
-
   })();
 </script>
 
-
 {% schema %}
 {
-  "name": "Custom Badges Embed",
+  "name": "Badge Engine Embed",
   "target": "body",
   "settings": []
 }

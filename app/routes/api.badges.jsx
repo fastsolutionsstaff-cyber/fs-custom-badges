@@ -5,83 +5,74 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
-  "Cache-Control": "no-store",
+  "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=120",
 };
 
-// CORS Preflight
-export const options = async () => {
-  return new Response(null, { status: 204, headers: corsHeaders });
-};
+export const options = async () => new Response(null, { status: 204, headers: corsHeaders });
 
-// GET: Fetch Active Badges for Storefront
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
   const shop = url.searchParams.get("shop");
 
   if (!shop) {
-    return json({ error: "Missing shop parameter" }, { status: 400, headers: corsHeaders });
+    return json({ error: "Missing Storefront Domain" }, { status: 400, headers: corsHeaders });
   }
 
   try {
+    const settings = await db.appSettings.findUnique({ where: { shop } });
     const badges = await db.badge.findMany({
       where: { shop, enabled: true },
       include: { products: true },
+      orderBy: { priority: "desc" },
     });
 
-    const responseBadges = badges.map((b) => {
-      const rawProductIds = b.products.map((p) => p.productId);
-      
-      // Extract numeric IDs alongside full GIDs for seamless theme matching
-      const numericIds = rawProductIds.map((id) => id.replace(/\D/g, "")).filter(Boolean);
+    const parsed = badges.map((b) => ({
+      id: b.id,
+      text: b.text,
+      bgColor: b.bgColor,
+      textColor: b.textColor,
+      borderColor: b.borderColor,
+      position: b.position,
+      shape: b.shape,
+      icon: b.icon,
+      fontSize: b.fontSize,
+      paddingX: b.paddingX,
+      paddingY: b.paddingY,
+      borderRadius: b.borderRadius,
+      priority: b.priority,
+      targetType: b.targetType,
+      targetTags: b.targetTags ? b.targetTags.split(",").map((t) => t.trim().toLowerCase()) : [],
+      minInventory: b.minInventory,
+      maxInventory: b.maxInventory,
+      minPrice: b.minPrice,
+      maxPrice: b.maxPrice,
+      customCss: b.customCss,
+      productIds: b.products.map((p) => p.productId.replace(/\D/g, "")),
+    }));
 
-      return {
-        id: b.id,
-        text: b.text,
-        bgColor: b.bgColor,
-        textColor: b.textColor,
-        position: b.position,
-        fontSize: b.fontSize || 11,
-        icon: b.icon || "",
-        shape: b.shape || "pill",
-        isGlobal: b.isGlobal,
-        productIds: [...new Set([...rawProductIds, ...numericIds])],
-      };
-    });
-
-    return json({ badges: responseBadges }, { headers: corsHeaders });
-  } catch (error) {
-    return json({ error: error.message }, { status: 500, headers: corsHeaders });
+    return json({ badges: parsed, globalCustomCss: settings?.globalCustomCss || "" }, { headers: corsHeaders });
+  } catch (err) {
+    return json({ error: err.message }, { status: 500, headers: corsHeaders });
   }
 };
 
-// POST: Track Impressions & Clicks Realtime
 export const action = async ({ request }) => {
-  if (request.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-
   try {
     const body = await request.json();
-    const { badgeId, type } = body;
+    const { badgeId, eventType } = body;
 
-    if (!badgeId || !type) {
-      return json({ error: "Missing tracking data" }, { status: 400, headers: corsHeaders });
+    if (!badgeId || !eventType) {
+      return json({ error: "Invalid Event Signature" }, { status: 400, headers: corsHeaders });
     }
 
-    if (type === "impression") {
-      await db.badge.update({
-        where: { id: badgeId },
-        data: { impressions: { increment: 1 } },
-      });
-    } else if (type === "click") {
-      await db.badge.update({
-        where: { id: badgeId },
-        data: { clicks: { increment: 1 } },
-      });
+    if (eventType === "IMPRESSION") {
+      await db.badge.update({ where: { id: badgeId }, data: { impressions: { increment: 1 } } });
+    } else if (eventType === "CLICK") {
+      await db.badge.update({ where: { id: badgeId }, data: { clicks: { increment: 1 } } });
     }
 
     return json({ success: true }, { headers: corsHeaders });
-  } catch (error) {
-    return json({ error: error.message }, { status: 500, headers: corsHeaders });
+  } catch (err) {
+    return json({ error: err.message }, { status: 500, headers: corsHeaders });
   }
 };

@@ -27,26 +27,91 @@ model Session {
   refreshTokenExpires DateTime?
 }
 
-model Badge {
-  id          String         @id @default(uuid())
-  shop        String
-  badgeIndex  Int
-  enabled     Boolean        @default(true)
-  text        String         @default("NEW")
-  bgColor     String         @default("#111827")
-  textColor   String         @default("#FFFFFF")
-  position    String         @default("top-left")
-  isGlobal    Boolean        @default(false)
-  fontSize    Int            @default(11)
-  icon        String?        @default("")
-  shape       String?        @default("pill")
-  impressions Int            @default(0)
-  clicks      Int            @default(0)
-  products    BadgeProduct[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+model AppSettings {
+  id               String   @id @default(uuid())
+  shop             String   @unique
+  badgeLimit       Int      @default(10)
+  globalCustomCss  String?  @default("")
+  enableAnalytics  Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
 
-  @@unique([shop, badgeIndex])
+enum TargetType {
+  GLOBAL
+  SPECIFIC_PRODUCTS
+  PRODUCT_TAGS
+  COLLECTIONS
+  INVENTORY_LEVEL
+  PRICE_RANGE
+  CUSTOMER_SEGMENT
+}
+
+enum BadgeShape {
+  PILL
+  SHARP
+  OUTLINE
+  RIBBON
+  FLOATING_GLOW
+  GLASSMORPHISM
+}
+
+enum Position {
+  TOP_LEFT
+  TOP_RIGHT
+  BOTTOM_LEFT
+  BOTTOM_RIGHT
+  CENTER_OVERLAY
+}
+
+model Badge {
+  id               String         @id @default(uuid())
+  shop             String
+  name             String         @default("Conversion Campaign")
+  enabled          Boolean        @default(true)
+  priority         Int            @default(0) // Resolves overlap conflict
+  
+  // Design & Typography
+  text             String         @default("BESTSELLER")
+  bgColor          String         @default("#DC2626")
+  textColor        String         @default("#FFFFFF")
+  borderColor      String?        @default("#B91C1C")
+  position         Position       @default(TOP_LEFT)
+  shape            BadgeShape     @default(PILL)
+  icon             String?        @default("🔥")
+  fontSize         Int            @default(12)
+  fontWeight       String         @default("bold")
+  paddingY         Int            @default(4)
+  paddingX         Int            @default(10)
+  borderRadius     Int            @default(20)
+  customCss        String?        @default("")
+  
+  // Advanced Rules & Targeting Engine
+  targetType       TargetType     @default(GLOBAL)
+  targetTags       String?        @default("") 
+  targetCollection String?        @default("")
+  minInventory     Int?           @default(0)
+  maxInventory     Int?           @default(9999)
+  minPrice         Float?         @default(0.00)
+  maxPrice         Float?         @default(99999.00)
+  
+  // Scheduling & Expirations
+  startDate        DateTime?
+  endDate          DateTime?
+  
+  // Performance & Tracking
+  impressions      Int            @default(0)
+  clicks           Int            @default(0)
+  conversions      Int            @default(0)
+  revenueGenerated Float          @default(0.00)
+  
+  products         BadgeProduct[]
+  analyticsLogs    AnalyticsLog[]
+  
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([shop, enabled, priority])
 }
 
 model BadgeProduct {
@@ -56,4 +121,14 @@ model BadgeProduct {
   badge     Badge  @relation(fields: [badgeId], references: [id], onDelete: Cascade)
 
   @@unique([badgeId, productId])
+}
+
+model AnalyticsLog {
+  id        String   @id @default(uuid())
+  badgeId   String
+  eventType String   // IMPRESSION, CLICK, CONVERSION
+  timestamp DateTime @default(now())
+  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@index([badgeId, eventType])
 }

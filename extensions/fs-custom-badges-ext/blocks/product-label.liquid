@@ -9,6 +9,9 @@
   class="fs-pdp-label-wrapper" 
   id="fs-pdp-label-{{ block.id }}"
   data-product-id="{{ current_product.id }}"
+  data-product-tags="{{ current_product.tags | join: ',' | downcase }}"
+  data-product-price="{{ current_product.price | divided_by: 100.0 }}"
+  data-product-inventory="{% if current_product.selected_or_first_available_variant.inventory_management %}{{ current_product.selected_or_first_available_variant.inventory_quantity }}{% else %}999{% endif %}"
   style="
     --label-bg-color: {{ block.settings.bg_color }};
     --label-text-color: {{ block.settings.text_color }};
@@ -54,6 +57,7 @@
     text-transform: uppercase;
     line-height: 1.2;
     transition: all 0.3s ease;
+    cursor: pointer;
   }
 
   .fs-pdp-badge.fs-shape-pill { border-radius: 50px; }
@@ -73,39 +77,87 @@
     const wrapper = document.getElementById("fs-pdp-label-{{ block.id }}");
     if (!wrapper) return;
 
-    const productId = wrapper.dataset.productId;
+    const API_ENDPOINT = '/apps/badges';
     const shop = "{{ shop.permanent_domain }}";
+
+    const productId = String(wrapper.dataset.productId || "").replace(/\D/g, "");
+    const tags = wrapper.dataset.productTags ? wrapper.dataset.productTags.split(',').map(t => t.trim()) : [];
+    const price = parseFloat(wrapper.dataset.productPrice || '0');
+    const inventory = parseInt(wrapper.dataset.productInventory || '999', 10);
 
     if (!productId) return;
 
+    function isEligible(badge) {
+      if (badge.isActive === false) return false;
+
+      const targetType = badge.targetType || (badge.isGlobal ? 'GLOBAL' : '');
+
+      if (targetType === 'GLOBAL') return true;
+
+      if (targetType === 'SPECIFIC_PRODUCTS' && Array.isArray(badge.productIds)) {
+        return badge.productIds.some(id => String(id).replace(/\D/g, "") === productId);
+      }
+
+      if (targetType === 'PRODUCT_TAGS' && Array.isArray(badge.targetTags)) {
+        const formattedTargetTags = badge.targetTags.map(t => String(t).toLowerCase().trim());
+        return tags.some(t => formattedTargetTags.includes(t));
+      }
+
+      if (targetType === 'INVENTORY_LEVEL') {
+        const min = badge.minInventory ?? 0;
+        const max = badge.maxInventory ?? Infinity;
+        return inventory >= min && inventory <= max;
+      }
+
+      if (targetType === 'PRICE_RANGE') {
+        const min = badge.minPrice ?? 0;
+        const max = badge.maxPrice ?? Infinity;
+        return price >= min && price <= max;
+      }
+
+      return false;
+    }
+
     async function fetchPDPLabel() {
       try {
-        const response = await fetch(`/apps/badges?shop=${encodeURIComponent(shop)}`);
+        const response = await fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(shop)}`);
         if (!response.ok) return;
 
         const data = await response.json();
         if (!data.badges || data.badges.length === 0) return;
 
-        const matchingBadge = data.badges.find(badge => {
-          if (badge.isGlobal) return true;
-          if (!badge.productIds) return false;
-
-          return badge.productIds.some(id => {
-            const cleanId = String(id).replace(/\D/g, "");
-            return cleanId === String(productId);
-          });
-        });
+        const matchingBadge = data.badges.find(badge => isEligible(badge));
 
         if (matchingBadge) {
           const iconHtml = matchingBadge.icon ? `<span class="fs-badge-icon">${matchingBadge.icon}</span>` : "";
-          const badgeShapeClass = "fs-shape-{{ block.settings.badge_shape }}";
+          const badgeShape = (matchingBadge.shape || "{{ block.settings.badge_shape }}").toLowerCase();
+
+          if (matchingBadge.bgColor) wrapper.style.setProperty('--label-bg-color', matchingBadge.bgColor);
+          if (matchingBadge.textColor) wrapper.style.setProperty('--label-text-color', matchingBadge.textColor);
 
           wrapper.innerHTML = `
-            <span class="fs-pdp-badge ${badgeShapeClass}">
+            <span class="fs-pdp-badge fs-shape-${badgeShape}" data-badge-id="${matchingBadge.id}">
               ${iconHtml}
               <span class="fs-badge-text">${matchingBadge.text}</span>
             </span>
           `;
+
+          const badgeEl = wrapper.querySelector('.fs-pdp-badge');
+          
+          badgeEl.addEventListener('click', () => {
+            fetch(API_ENDPOINT, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ badgeId: matchingBadge.id, eventType: 'CLICK', productId }),
+            });
+          });
+
+          // Impression Track
+          fetch(API_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ badgeId: matchingBadge.id, eventType: 'IMPRESSION', productId }),
+          });
         }
       } catch (err) {
         console.error("PDP Label Fetch Error:", err);
@@ -228,4 +280,4 @@
     }
   ]
 }
-{% endschema %}
+{% endschema %}s

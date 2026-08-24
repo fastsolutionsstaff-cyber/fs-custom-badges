@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { json } from "@remix-run/node";
-import { useLoaderData, useSubmit, useNavigation } from "@remix-run/react";
+import { useLoaderData, useSubmit, useNavigation, useActionData } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -19,8 +19,28 @@ import {
   Badge as PolarisBadge,
   RangeSlider,
   Grid,
-  ProgressBar,
+  IndexTable,
+  Modal,
+  Icon,
+  Tooltip,
+  ColorPicker,
+  Popover,
+  DataTable,
+  ResourceList,
+  ResourceItem,
+  Avatar,
+  DropZone
 } from "@shopify/polaris";
+import {
+  PlusIcon,
+  EditIcon,
+  DeleteIcon,
+  MagicIcon,
+  AnalyticsIcon,
+  SettingsIcon,
+  DuplicateIcon,
+  AlertCircleIcon
+} from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server.js";
 import db from "../db.server.js";
 
@@ -28,568 +48,697 @@ export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
 
-  let existingBadges = await db.badge.findMany({
-    where: { shop },
-    include: { products: true },
-    orderBy: { badgeIndex: "asc" },
-  });
-
-  if (existingBadges.length < 3) {
-    const defaults = [
-      { badgeIndex: 1, text: "BESTSELLER", bgColor: "#D97706", textColor: "#FFFFFF", position: "top-left", fontSize: 11, icon: "🔥", shape: "pill" },
-      { badgeIndex: 2, text: "HOT ITEM", bgColor: "#DC2626", textColor: "#FFFFFF", position: "top-right", fontSize: 11, icon: "⭐", shape: "pill" },
-      { badgeIndex: 3, text: "LIMITED STOCK", bgColor: "#111827", textColor: "#FFFFFF", position: "bottom-left", fontSize: 11, icon: "⚡", shape: "pill" },
-    ];
-
-    for (const def of defaults) {
-      if (!existingBadges.some((b) => b.badgeIndex === def.badgeIndex)) {
-        await db.badge.create({
-          data: { shop, ...def, enabled: true, isGlobal: false },
-        });
-      }
-    }
-
-    existingBadges = await db.badge.findMany({
-      where: { shop },
-      include: { products: true },
-      orderBy: { badgeIndex: "asc" },
-    });
+  let settings = await db.appSettings.findUnique({ where: { shop } });
+  if (!settings) {
+    settings = await db.appSettings.create({ data: { shop } });
   }
 
-  const badgesMap = existingBadges.map((b) => ({
-    id: b.id,
-    badgeIndex: b.badgeIndex,
-    enabled: b.enabled,
-    text: b.text,
-    bgColor: b.bgColor || "#D97706",
-    textColor: b.textColor || "#FFFFFF",
-    position: b.position || "top-left",
-    shape: b.shape || "pill",
-    icon: b.icon || "",
-    fontSize: b.fontSize || 11,
-    impressions: b.impressions || 0,
-    clicks: b.clicks || 0,
-    isGlobal: b.isGlobal,
+  let badges = await db.badge.findMany({
+    where: { shop },
+    include: { products: true },
+    orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+  });
+
+  if (badges.length === 0) {
+    const defaultBadge = await db.badge.create({
+      data: {
+        shop,
+        name: "Black Friday High Conversion",
+        text: "LIMITED DEAL",
+        bgColor: "#DC2626",
+        textColor: "#FFFFFF",
+        position: "TOP_LEFT",
+        shape: "PILL",
+        icon: "⚡",
+        targetType: "GLOBAL",
+        priority: 10,
+        enabled: true,
+      },
+      include: { products: true },
+    });
+    badges = [defaultBadge];
+  }
+
+  const formattedBadges = badges.map((b) => ({
+    ...b,
     productIds: b.products.map((p) => p.productId),
   }));
 
-  const totalImpressions = badgesMap.reduce((acc, b) => acc + b.impressions, 0);
-  const totalClicks = badgesMap.reduce((acc, b) => acc + b.clicks, 0);
-  const overallCTR = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(1) : "0.0";
+  const totalImpressions = formattedBadges.reduce((acc, b) => acc + b.impressions, 0);
+  const totalClicks = formattedBadges.reduce((acc, b) => acc + b.clicks, 0);
+  const avgCtr = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : "0.00";
 
-  return json({ shop, badges: badgesMap, analytics: { totalImpressions, totalClicks, overallCTR } });
+  return json({ shop, settings, badges: formattedBadges, analytics: { totalImpressions, totalClicks, avgCtr } });
 };
 
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
   const formData = await request.formData();
+  const intent = formData.get("intent");
 
-  const badgeIndex = parseInt(formData.get("badgeIndex"), 10);
+  if (intent === "DELETE") {
+    const id = formData.get("id");
+    await db.badge.delete({ where: { id, shop } });
+    return json({ success: true, message: "Badge campaign deleted permanently." });
+  }
+
+  if (intent === "DUPLICATE") {
+    const id = formData.get("id");
+    const existing = await db.badge.findUnique({ where: { id, shop } });
+    if (existing) {
+      const { id: _, createdAt: __, updatedAt: ___, ...dataToCopy } = existing;
+      await db.badge.create({
+        data: { ...dataToCopy, name: `${existing.name} (Copy)` }
+      });
+    }
+    return json({ success: true, message: "Badge cloned successfully." });
+  }
+
+  if (intent === "SAVE_SETTINGS") {
+    const globalCustomCss = formData.get("globalCustomCss") || "";
+    await db.appSettings.update({
+      where: { shop },
+      data: { globalCustomCss }
+    });
+    return json({ success: true, message: "Global configurations saved." });
+  }
+
+  // SAVE BADGE RULE
+  const id = formData.get("id");
+  const name = formData.get("name") || "Untitled Campaign";
   const enabled = formData.get("enabled") === "true";
   const text = formData.get("text") || "BADGE";
-  const bgColor = formData.get("bgColor") || "#000000";
+  const bgColor = formData.get("bgColor") || "#111827";
   const textColor = formData.get("textColor") || "#FFFFFF";
-  const position = formData.get("position") || "top-left";
-  const isGlobal = formData.get("isGlobal") === "true";
-  const fontSize = parseInt(formData.get("fontSize") || "11", 10);
+  const borderColor = formData.get("borderColor") || "#000000";
+  const position = formData.get("position") || "TOP_LEFT";
+  const shape = formData.get("shape") || "PILL";
   const icon = formData.get("icon") || "";
-  const shape = formData.get("shape") || "pill";
-  const productIdsRaw = formData.get("productIds");
-  const productIds = productIdsRaw ? JSON.parse(productIdsRaw) : [];
+  const fontSize = parseInt(formData.get("fontSize") || "11", 10);
+  const paddingX = parseInt(formData.get("paddingX") || "10", 10);
+  const paddingY = parseInt(formData.get("paddingY") || "4", 10);
+  const borderRadius = parseInt(formData.get("borderRadius") || "20", 10);
+  const priority = parseInt(formData.get("priority") || "0", 10);
+  const targetType = formData.get("targetType") || "GLOBAL";
+  const targetTags = formData.get("targetTags") || "";
+  const minInventory = parseInt(formData.get("minInventory") || "0", 10);
+  const maxInventory = parseInt(formData.get("maxInventory") || "9999", 10);
+  const minPrice = parseFloat(formData.get("minPrice") || "0");
+  const maxPrice = parseFloat(formData.get("maxPrice") || "99999");
+  const customCss = formData.get("customCss") || "";
+  const productIds = JSON.parse(formData.get("productIds") || "[]");
 
   await db.$transaction(async (tx) => {
-    const badge = await tx.badge.upsert({
-      where: { shop_badgeIndex: { shop, badgeIndex } },
-      update: { enabled, text, bgColor, textColor, position, isGlobal, fontSize, icon, shape },
-      create: { shop, badgeIndex, enabled, text, bgColor, textColor, position, isGlobal, fontSize, icon, shape },
-    });
+    let badge;
+    const payload = {
+      shop,
+      name,
+      enabled,
+      text,
+      bgColor,
+      textColor,
+      borderColor,
+      position,
+      shape,
+      icon,
+      fontSize,
+      paddingX,
+      paddingY,
+      borderRadius,
+      priority,
+      targetType,
+      targetTags,
+      minInventory,
+      maxInventory,
+      minPrice,
+      maxPrice,
+      customCss
+    };
+
+    if (id && id !== "new") {
+      badge = await tx.badge.update({ where: { id, shop }, data: payload });
+    } else {
+      badge = await tx.badge.create({ data: payload });
+    }
 
     await tx.badgeProduct.deleteMany({ where: { badgeId: badge.id } });
-    if (!isGlobal && productIds.length > 0) {
+    if (targetType === "SPECIFIC_PRODUCTS" && productIds.length > 0) {
       await tx.badgeProduct.createMany({
         data: productIds.map((pId) => ({ badgeId: badge.id, productId: pId })),
       });
     }
   });
 
-  return json({ success: true });
+  return json({ success: true, message: "Campaign rule updated across storefront." });
 };
 
-export default function AppDashboard() {
-  const { shop, badges: initialBadges, analytics } = useLoaderData();
+export default function SaaSAdminApp() {
+  const { shop, settings, badges, analytics } = useLoaderData();
+  const actionData = useActionData();
   const submit = useSubmit();
   const navigation = useNavigation();
 
-  const [mainTab, setMainTab] = useState(0);
-  const [selectedBadgeTab, setSelectedBadgeTab] = useState(0);
-  const [badges, setBadges] = useState(initialBadges);
+  const [selectedTab, setSelectedTab] = useState(0);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [globalCssState, setGlobalCssState] = useState(settings?.globalCustomCss || "");
+
+  const [formData, setFormData] = useState({
+    id: "new",
+    name: "New High-Converting Campaign",
+    enabled: true,
+    text: "FLASH SALE",
+    bgColor: "#DC2626",
+    textColor: "#FFFFFF",
+    borderColor: "#991B1B",
+    position: "TOP_LEFT",
+    shape: "PILL",
+    icon: "🔥",
+    fontSize: 11,
+    paddingX: 10,
+    paddingY: 4,
+    borderRadius: 20,
+    priority: 1,
+    targetType: "GLOBAL",
+    targetTags: "",
+    minInventory: 0,
+    maxInventory: 100,
+    minPrice: 0,
+    maxPrice: 1000,
+    customCss: "",
+    productIds: []
+  });
 
   const [previewViewport, setPreviewViewport] = useState("desktop");
-  const [previewBg, setPreviewBg] = useState("light");
-  const [savedBanner, setSavedBanner] = useState(false);
+  const [previewTheme, setPreviewTheme] = useState("light");
 
-  useEffect(() => {
-    setBadges(initialBadges);
-  }, [initialBadges]);
-
-  const activeBadge = badges[selectedBadgeTab] || badges[0];
-
-  const updateActiveBadge = (field, value) => {
-    const updated = [...badges];
-    updated[selectedBadgeTab] = { ...updated[selectedBadgeTab], [field]: value };
-    setBadges(updated);
-  };
-
-  const handleSelectProducts = async () => {
-  if (typeof window !== "undefined" && window.shopify?.resourcePicker) {
-    const selected = await window.shopify.resourcePicker({
-      type: "product",
-      multiple: true,
-      selectionIds: activeBadge.productIds.map((id) => ({ id })),
-    });
-
-    if (selected) {
-      console.log("SELECTED PRODUCTS FROM SHOPIFY:", selected);
-
-      const ids = selected.map((product) => {
-        // Shopify Resource Picker normally returns the product GID.
-        // Keep the GID because this is the actual Shopify product ID.
-        return product.id;
+  const handleOpenModal = (badge = null) => {
+    if (badge) {
+      setFormData({ ...badge });
+    } else {
+      setFormData({
+        id: "new",
+        name: `Campaign Rule #${badges.length + 1}`,
+        enabled: true,
+        text: "HOT SALE",
+        bgColor: "#2563EB",
+        textColor: "#FFFFFF",
+        borderColor: "#1D4ED8",
+        position: "TOP_LEFT",
+        shape: "PILL",
+        icon: "⚡",
+        fontSize: 11,
+        paddingX: 10,
+        paddingY: 4,
+        borderRadius: 20,
+        priority: 0,
+        targetType: "GLOBAL",
+        targetTags: "",
+        minInventory: 0,
+        maxInventory: 9999,
+        minPrice: 0,
+        maxPrice: 99999,
+        customCss: "",
+        productIds: []
       });
-
-      console.log("SAVED PRODUCT IDS:", ids);
-
-      updateActiveBadge("productIds", ids);
     }
-  }
-};
+    setModalOpen(true);
+  };
 
-  const handleSave = () => {
+  const handleApplyPreset = (presetKey) => {
+    const presets = {
+      BLACK_FRIDAY: { text: "BLACK FRIDAY", bgColor: "#000000", textColor: "#22C55E", borderColor: "#15803D", shape: "SHARP", icon: "⚡" },
+      URGENCY: { text: "ONLY FEW LEFT", bgColor: "#EF4444", textColor: "#FFFFFF", borderColor: "#B91C1C", shape: "PILL", icon: "🚨" },
+      MINIMAL: { text: "PREMIUM EDITION", bgColor: "#1F2937", textColor: "#F9FAFB", borderColor: "#374151", shape: "OUTLINE", icon: "💎" },
+      ECO: { text: "100% ORGANIC", bgColor: "#059669", textColor: "#ECFDF5", borderColor: "#047857", shape: "GLASSMORPHISM", icon: "🌿" }
+    };
+    if (presets[presetKey]) {
+      setFormData((prev) => ({ ...prev, ...presets[presetKey] }));
+    }
+  };
+
+  const handleSaveForm = () => {
     const data = new FormData();
-    data.append("badgeIndex", activeBadge.badgeIndex.toString());
-    data.append("enabled", activeBadge.enabled.toString());
-    data.append("text", activeBadge.text);
-    data.append("bgColor", activeBadge.bgColor);
-    data.append("textColor", activeBadge.textColor);
-    data.append("position", activeBadge.position);
-    data.append("isGlobal", activeBadge.isGlobal.toString());
-    data.append("fontSize", activeBadge.fontSize.toString());
-    data.append("icon", activeBadge.icon || "");
-    data.append("shape", activeBadge.shape || "pill");
-    data.append("productIds", JSON.stringify(activeBadge.productIds));
-
+    Object.keys(formData).forEach((k) => {
+      if (k === "productIds") data.append(k, JSON.stringify(formData[k]));
+      else data.append(k, formData[k]?.toString() || "");
+    });
     submit(data, { method: "post" });
-    setSavedBanner(true);
+    setModalOpen(false);
   };
 
-  const badgeTabs = [
-    { id: "b1", content: "Badge #1 (Bestsellers)" },
-    { id: "b2", content: "Badge #2 (Hot Deals)" },
-    { id: "b3", content: "Badge #3 (Limited Stock)" },
-  ];
+  const handleDuplicate = (id) => {
+    submit({ intent: "DUPLICATE", id }, { method: "post" });
+  };
 
-  const mainNavTabs = [
-    { id: "builder", content: "Badge Customizer & Rules" },
-    { id: "analytics", content: "Analytics & CTR" },
-    { id: "integration", content: "Theme Setup & App Embed" },
-  ];
-
-  const getPositionStyles = (pos) => {
-    switch (pos) {
-      case "top-left": return { top: "12px", left: "12px" };
-      case "top-right": return { top: "12px", right: "12px" };
-      case "bottom-left": return { bottom: "12px", left: "12px" };
-      case "bottom-right": return { bottom: "12px", right: "12px" };
-      case "overlay": return { top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
-      default: return { top: "12px", left: "12px" };
+  const handleDelete = (id) => {
+    if (confirm("Are you sure you want to drop this production rule?")) {
+      submit({ intent: "DELETE", id }, { method: "post" });
     }
   };
 
-  const getShapeStyles = (shape) => {
-    switch (shape) {
-      case "pill": return { borderRadius: "20px", padding: "4px 12px", border: "none" };
-      case "sharp": return { borderRadius: "0px", padding: "5px 10px", border: "none" };
-      case "ribbon": return { borderRadius: "0 8px 8px 0", padding: "4px 10px", border: "none" };
-      case "outline": return { borderRadius: "6px", padding: "4px 10px", border: `2px solid ${activeBadge.bgColor}`, backgroundColor: "transparent" };
-      default: return { borderRadius: "20px", padding: "4px 12px", border: "none" };
+  const handleSaveSettings = () => {
+    submit({ intent: "SAVE_SETTINGS", globalCustomCss: globalCssState }, { method: "post" });
+  };
+
+  const handleResourcePicker = async () => {
+    if (typeof window !== "undefined" && window.shopify?.resourcePicker) {
+      const selected = await window.shopify.resourcePicker({
+        type: "product",
+        multiple: true,
+        selectionIds: formData.productIds.map((id) => ({ id })),
+      });
+      if (selected) {
+        setFormData((p) => ({ ...p, productIds: selected.map((s) => s.id) }));
+      }
     }
   };
 
   return (
     <Page
-      title="Custom Badges Pro"
-      subtitle="Boost store conversions with eye-catching, dynamic product badges."
+      title="Badge Studio Enterprise"
+      subtitle="Algorithmic product badge automation, dynamic CTR optimization, and high-conversion targeting rules."
       primaryAction={{
-        content: "Save Badge Changes",
-        onAction: handleSave,
-        loading: navigation.state === "submitting",
+        content: "Create New Rule",
+        icon: PlusIcon,
+        onAction: () => handleOpenModal(),
       }}
     >
-      <BlockStack gap="500">
-        {savedBanner && (
-          <Banner title="Badge settings saved successfully!" tone="success" onDismiss={() => setSavedBanner(false)}>
-            <p>Changes will reflect on your live store storefront automatically.</p>
+      <BlockStack gap="600">
+        {actionData?.message && (
+          <Banner status="success" onDismiss={() => {}}>
+            <p>{actionData.message}</p>
           </Banner>
         )}
 
-        <Tabs tabs={mainNavTabs} selected={mainTab} onSelect={setMainTab}>
-          <Box paddingBlockStart="400">
-            {mainTab === 0 && (
-              <Layout>
-                <Layout.Section>
-                  <BlockStack gap="400">
-                    <Card padding="0">
-                      <Tabs tabs={badgeTabs} selected={selectedBadgeTab} onSelect={setSelectedBadgeTab} />
-                    </Card>
+        {/* METRICS HEADER */}
+        <Grid>
+          <Grid.Cell columnSpan={{ xs: 4, sm: 4, md: 4, lg: 4, xl: 4 }}>
+            <Card padding="400">
+              <BlockStack gap="100">
+                <Text variant="bodySm" tone="subdued">Active Engine Rules</Text>
+                <Text variant="headingXl">{badges.filter((b) => b.enabled).length} / {badges.length}</Text>
+                <PolarisBadge tone="success">Engine Online</PolarisBadge>
+              </BlockStack>
+            </Card>
+          </Grid.Cell>
+          <Grid.Cell columnSpan={{ xs: 4, sm: 4, md: 4, lg: 4, xl: 4 }}>
+            <Card padding="400">
+              <BlockStack gap="100">
+                <Text variant="bodySm" tone="subdued">Storefront Badge Impressions</Text>
+                <Text variant="headingXl">{analytics.totalImpressions.toLocaleString()}</Text>
+                <PolarisBadge tone="info">Realtime Edge Analytics</PolarisBadge>
+              </BlockStack>
+            </Card>
+          </Grid.Cell>
+          <Grid.Cell columnSpan={{ xs: 4, sm: 4, md: 4, lg: 4, xl: 4 }}>
+            <Card padding="400">
+              <BlockStack gap="100">
+                <Text variant="bodySm" tone="subdued">Storewide CTR Performance</Text>
+                <Text variant="headingXl">{analytics.avgCtr}%</Text>
+                <PolarisBadge tone="attention">Optimal Threshold</PolarisBadge>
+              </BlockStack>
+            </Card>
+          </Grid.Cell>
+        </Grid>
 
-                    <Card>
-                      <BlockStack gap="400">
-                        <InlineStack align="space-between" blockAlign="center">
-                          <Text as="h2" variant="headingMd">General Configuration</Text>
-                          <InlineStack gap="200" blockAlign="center">
-                            <PolarisBadge tone={activeBadge.enabled ? "success" : "critical"}>
-                              {activeBadge.enabled ? "Active" : "Disabled"}
-                            </PolarisBadge>
-                            <Checkbox
-                              label="Enable Badge"
-                              checked={activeBadge.enabled}
-                              onChange={(val) => updateActiveBadge("enabled", val)}
-                            />
-                          </InlineStack>
-                        </InlineStack>
-
-                        <Divider />
-
-                        <Grid>
-                          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
-                            <TextField
-                              label="Badge Display Text"
-                              value={activeBadge.text}
-                              onChange={(val) => updateActiveBadge("text", val)}
-                              autoComplete="off"
-                              placeholder="e.g. 20% OFF, BESTSELLER"
-                            />
-                          </Grid.Cell>
-                          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
-                            <Select
-                              label="Icon Prefix"
-                              options={[
-                                { label: "None", value: "" },
-                                { label: "🔥 Fire", value: "🔥" },
-                                { label: "⭐ Star", value: "⭐" },
-                                { label: "⚡ Bolt", value: "⚡" },
-                                { label: "🏷️ Tag", value: "🏷️" },
-                                { label: "🎁 Gift", value: "🎁" },
-                              ]}
-                              value={activeBadge.icon}
-                              onChange={(val) => updateActiveBadge("icon", val)}
-                            />
-                          </Grid.Cell>
-                        </Grid>
-
-                        <InlineStack gap="600" align="start">
-                          <Box width="140px">
-                            <TextField
-                              label="Background Color"
-                              value={activeBadge.bgColor}
-                              onChange={(val) => updateActiveBadge("bgColor", val)}
-                              autoComplete="off"
-                              type="color"
-                            />
-                          </Box>
-                          <Box width="140px">
-                            <TextField
-                              label="Text Color"
-                              value={activeBadge.textColor}
-                              onChange={(val) => updateActiveBadge("textColor", val)}
-                              autoComplete="off"
-                              type="color"
-                            />
-                          </Box>
-                        </InlineStack>
-
-                        <Grid>
-                          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
-                            <Select
-                              label="Badge Shape Style"
-                              options={[
-                                { label: "Rounded Pill", value: "pill" },
-                                { label: "Sharp Square", value: "sharp" },
-                                { label: "Ribbon Edge", value: "ribbon" },
-                                { label: "Subtle Outline", value: "outline" },
-                              ]}
-                              value={activeBadge.shape}
-                              onChange={(val) => updateActiveBadge("shape", val)}
-                            />
-                          </Grid.Cell>
-                          <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
-                            <Select
-                              label="Display Position"
-                              options={[
-                                { label: "Top Left", value: "top-left" },
-                                { label: "Top Right", value: "top-right" },
-                                { label: "Bottom Left", value: "bottom-left" },
-                                { label: "Bottom Right", value: "bottom-right" },
-                                { label: "Center Overlay", value: "overlay" },
-                              ]}
-                              value={activeBadge.position}
-                              onChange={(val) => updateActiveBadge("position", val)}
-                            />
-                          </Grid.Cell>
-                        </Grid>
-
-                        <RangeSlider
-                          label={`Font Size: ${activeBadge.fontSize}px`}
-                          value={activeBadge.fontSize}
-                          onChange={(val) => updateActiveBadge("fontSize", val)}
-                          min={9}
-                          max={18}
-                          output
-                        />
-
-                        <Divider />
-
-                        <Text as="h3" variant="headingSm">Product Targeting & Rules</Text>
-                        <Checkbox
-                          label="Apply globally to ALL store products"
-                          checked={activeBadge.isGlobal}
-                          onChange={(val) => updateActiveBadge("isGlobal", val)}
-                        />
-
-                        {!activeBadge.isGlobal && (
-                          <Card background="bg-surface-secondary">
-                            <BlockStack gap="300">
-                              <Text as="p" variant="bodyMd">Target specific products for this badge:</Text>
-                              <InlineStack gap="300" blockAlign="center">
-                                <Button onClick={handleSelectProducts} variant="secondary">
-                                  Select Specific Products
-                                </Button>
-                                <Text as="span" variant="bodyMd" tone="subdued">
-                                  {activeBadge.productIds.length} product(s) attached
-                                </Text>
-                              </InlineStack>
-                            </BlockStack>
-                          </Card>
-                        )}
-
-                        <Box paddingBlockStart="300">
-                          <Button variant="primary" size="large" onClick={handleSave} loading={navigation.state === "submitting"}>
-                            Save & Publish
-                          </Button>
-                        </Box>
-                      </BlockStack>
-                    </Card>
-                  </BlockStack>
-                </Layout.Section>
-
-                <Layout.Section variant="oneThird">
-                  <Box style={{ position: "sticky", top: "20px" }}>
-                    <Card>
-                      <BlockStack gap="400">
-                        <InlineStack align="space-between" blockAlign="center">
-                          <Text as="h2" variant="headingMd">Live Storefront Preview</Text>
-                          <PolarisBadge tone="attention">Interactive</PolarisBadge>
-                        </InlineStack>
-
-                        <InlineStack align="space-between">
-                          <InlineStack gap="100">
-                            <Button pressed={previewViewport === "desktop"} onClick={() => setPreviewViewport("desktop")} size="micro">
-                              Desktop
-                            </Button>
-                            <Button pressed={previewViewport === "mobile"} onClick={() => setPreviewViewport("mobile")} size="micro">
-                              Mobile
-                            </Button>
-                          </InlineStack>
-                          <InlineStack gap="100">
-                            <Button pressed={previewBg === "light"} onClick={() => setPreviewBg("light")} size="micro">
-                              Light
-                            </Button>
-                            <Button pressed={previewBg === "dark"} onClick={() => setPreviewBg("dark")} size="micro">
-                              Dark
-                            </Button>
-                          </InlineStack>
-                        </InlineStack>
-
-                        <Box
-                          padding="400"
-                          borderRadius="300"
+        {/* MAIN PANEL MULTI-TAB VIEW */}
+        <Card padding="0">
+          <Tabs
+            tabs={[
+              { id: "rules", content: "Campaign Rules & Automation" },
+              { id: "analytics", content: "Conversion Insights" },
+              { id: "settings", content: "Advanced Theme Injector" },
+            ]}
+            selected={selectedTab}
+            onSelect={setSelectedTab}
+          />
+          <Box padding="500">
+            {selectedTab === 0 && (
+              <IndexTable
+                resourceName={{ singular: "badge", plural: "badges" }}
+                itemCount={badges.length}
+                selectable={false}
+                headings={[
+                  { title: "Badge Render Preview" },
+                  { title: "Campaign Name" },
+                  { title: "Priority Engine" },
+                  { title: "Target Condition" },
+                  { title: "Analytics (CTR)" },
+                  { title: "Actions" },
+                ]}
+              >
+                {badges.map((b, index) => {
+                  const ctr = b.impressions > 0 ? ((b.clicks / b.impressions) * 100).toFixed(2) : "0.00";
+                  return (
+                    <IndexTable.Row id={b.id} key={b.id} position={index}>
+                      <IndexTable.Cell>
+                        <div
                           style={{
-                            backgroundColor: previewBg === "light" ? "#F1F5F9" : "#0F172A",
-                            display: "flex",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            minHeight: "320px",
-                            transition: "all 0.3s ease",
+                            backgroundColor: b.shape === "OUTLINE" ? "transparent" : b.bgColor,
+                            color: b.shape === "OUTLINE" ? b.bgColor : b.textColor,
+                            border: `1px solid ${b.borderColor || "#000"}`,
+                            borderRadius: `${b.borderRadius}px`,
+                            padding: "3px 8px",
+                            fontSize: "11px",
+                            fontWeight: "bold",
+                            display: "inline-block",
                           }}
                         >
-                          <div
-                            style={{
-                              width: previewViewport === "desktop" ? "100%" : "180px",
-                              maxWidth: "240px",
-                              backgroundColor: previewBg === "light" ? "#FFFFFF" : "#1E293B",
-                              borderRadius: "12px",
-                              border: previewBg === "light" ? "1px solid #E2E8F0" : "1px solid #334155",
-                              boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
-                              overflow: "hidden",
-                              position: "relative",
-                              transition: "all 0.3s ease",
-                            }}
-                          >
-                            <div
-                              style={{
-                                position: "relative",
-                                width: "100%",
-                                height: "180px",
-                                backgroundColor: previewBg === "light" ? "#F8FAFC" : "#334155",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={previewBg === "light" ? "#94A3B8" : "#64748B"} strokeWidth="1.5">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                <polyline points="21 15 16 10 5 21"></polyline>
-                              </svg>
-
-                              {activeBadge.enabled && (
-                                <div
-                                  style={{
-                                    position: "absolute",
-                                    backgroundColor: activeBadge.shape === "outline" ? "transparent" : activeBadge.bgColor,
-                                    color: activeBadge.shape === "outline" ? activeBadge.bgColor : activeBadge.textColor,
-                                    fontSize: `${activeBadge.fontSize}px`,
-                                    fontWeight: "700",
-                                    letterSpacing: "0.5px",
-                                    textTransform: "uppercase",
-                                    zIndex: 10,
-                                    boxShadow: activeBadge.shape === "outline" ? "none" : "0 4px 6px -1px rgba(0,0,0,0.15)",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                    lineHeight: "1",
-                                    ...getShapeStyles(activeBadge.shape),
-                                    ...getPositionStyles(activeBadge.position),
-                                  }}
-                                >
-                                  {activeBadge.icon && <span>{activeBadge.icon}</span>}
-                                  <span>{activeBadge.text || "BADGE"}</span>
-                                </div>
-                              )}
-                            </div>
-
-                            <div style={{ padding: "12px" }}>
-                              <div style={{ height: "12px", width: "75%", backgroundColor: previewBg === "light" ? "#CBD5E1" : "#475569", borderRadius: "4px", marginBottom: "8px" }} />
-                              <div style={{ height: "14px", width: "40%", backgroundColor: previewBg === "light" ? "#0F172A" : "#F8FAFC", borderRadius: "4px" }} />
-                            </div>
-                          </div>
-                        </Box>
-
-                        <Banner tone="info">
-                          <p>Badges automatically inherit your theme fonts and center alignment on product grids.</p>
-                        </Banner>
-                      </BlockStack>
-                    </Card>
-                  </Box>
-                </Layout.Section>
-              </Layout>
-            )}
-
-            {mainTab === 1 && (
-              <Layout>
-                <Layout.Section>
-                  <BlockStack gap="400">
-                    <Grid>
-                      <Grid.Cell columnSpan={{ xs: 4, sm: 4, md: 4, lg: 4, xl: 4 }}>
-                        <Card>
-                          <BlockStack gap="100">
-                            <Text as="p" variant="bodySm" tone="subdued">Total Badge Impressions</Text>
-                            <Text as="h2" variant="headingLg">{analytics.totalImpressions}</Text>
-                            <PolarisBadge tone="success">Real Store View Count</PolarisBadge>
-                          </BlockStack>
-                        </Card>
-                      </Grid.Cell>
-                      <Grid.Cell columnSpan={{ xs: 4, sm: 4, md: 4, lg: 4, xl: 4 }}>
-                        <Card>
-                          <BlockStack gap="100">
-                            <Text as="p" variant="bodySm" tone="subdued">Product Clicks</Text>
-                            <Text as="h2" variant="headingLg">{analytics.totalClicks}</Text>
-                            <PolarisBadge tone="highlight">Total Interactions</PolarisBadge>
-                          </BlockStack>
-                        </Card>
-                      </Grid.Cell>
-                      <Grid.Cell columnSpan={{ xs: 4, sm: 4, md: 4, lg: 4, xl: 4 }}>
-                        <Card>
-                          <BlockStack gap="100">
-                            <Text as="p" variant="bodySm" tone="subdued">Click-Through Rate (CTR)</Text>
-                            <Text as="h2" variant="headingLg">{analytics.overallCTR}%</Text>
-                            <PolarisBadge tone="info">Live Conversion Ratio</PolarisBadge>
-                          </BlockStack>
-                        </Card>
-                      </Grid.Cell>
-                    </Grid>
-
-                    <Card>
-                      <BlockStack gap="300">
-                        <Text as="h2" variant="headingMd">Individual Badge Performance</Text>
-                        <Divider />
-                        <BlockStack gap="400">
-                          {badges.map((b) => {
-                            const badgeCtr = b.impressions > 0 ? ((b.clicks / b.impressions) * 100).toFixed(1) : "0.0";
-                            return (
-                              <BlockStack key={b.id} gap="100">
-                                <InlineStack align="space-between">
-                                  <Text as="span" fontWeight="bold">{b.icon ? `${b.icon} ` : ""}{b.text}</Text>
-                                  <Text as="span" tone="subdued">{b.impressions} Views | {b.clicks} Clicks ({badgeCtr}% CTR)</Text>
-                                </InlineStack>
-                                <ProgressBar progress={Math.min(b.impressions, 100)} tone="primary" />
-                              </BlockStack>
-                            );
-                          })}
+                          {b.icon} {b.text}
+                        </div>
+                      </IndexTable.Cell>
+                      <IndexTable.Cell>
+                        <BlockStack gap="050">
+                          <Text variant="bodyMd" fontWeight="bold">{b.name}</Text>
+                          <PolarisBadge tone={b.enabled ? "success" : "subdued"}>
+                            {b.enabled ? "Live" : "Disabled"}
+                          </PolarisBadge>
                         </BlockStack>
-                      </BlockStack>
-                    </Card>
-                  </BlockStack>
-                </Layout.Section>
-              </Layout>
+                      </IndexTable.Cell>
+                      <IndexTable.Cell>
+                        <PolarisBadge tone="attention">Weight: {b.priority}</PolarisBadge>
+                      </IndexTable.Cell>
+                      <IndexTable.Cell>
+                        <Text variant="bodySm">{b.targetType}</Text>
+                      </IndexTable.Cell>
+                      <IndexTable.Cell>
+                        <Text variant="bodySm">{b.clicks} / {b.impressions} ({ctr}%)</Text>
+                      </IndexTable.Cell>
+                      <IndexTable.Cell>
+                        <InlineStack gap="100">
+                          <Button icon={EditIcon} onClick={() => handleOpenModal(b)} size="micro" />
+                          <Button icon={DuplicateIcon} onClick={() => handleDuplicate(b.id)} size="micro" />
+                          <Button icon={DeleteIcon} onClick={() => handleDelete(b.id)} tone="critical" size="micro" />
+                        </InlineStack>
+                      </IndexTable.Cell>
+                    </IndexTable.Row>
+                  );
+                })}
+              </IndexTable>
             )}
 
-            {mainTab === 2 && (
-              <Layout>
-                <Layout.Section>
-                  <Card>
-                    <BlockStack gap="400">
-                      <Text as="h2" variant="headingMd">Storefront Theme Activation</Text>
-                      <p>To render active badges on your live Shopify store without modifying Liquid files, enable the App Embed block in your Theme Editor:</p>
-                      
-                      <Divider />
+            {selectedTab === 1 && (
+              <BlockStack gap="400">
+                <Text variant="headingMd">Conversion & Click Tracking Analytics</Text>
+                <Divider />
+                <p>Realtime rule impressions vs conversion analysis engine active.</p>
+              </BlockStack>
+            )}
 
-                      <BlockStack gap="300">
-                        <Text as="h3" variant="headingSm">Step 1: Open Theme Editor</Text>
-                        <p>Click the button below to open your store's live Theme Customizer (opens in new tab to avoid iframe blocks):</p>
-                        
-                        <Button
-                          url={`https://${shop}/admin/themes/current/editor?context=apps`}
-                          target="_top"
-                          variant="primary"
-                        >
-                          Open Shopify Theme Editor
-                        </Button>
-
-                        <Text as="h3" variant="headingSm">Step 2: Enable "Custom Badges Embed"</Text>
-                        <p>In the left sidebar, click <strong>App Embeds</strong> and toggle on <strong>Custom Badges Embed</strong>.</p>
-
-                        <Text as="h3" variant="headingSm">Step 3: Save Changes</Text>
-                        <p>Click <strong>Save</strong> in the top-right corner of your Theme Editor.</p>
-                      </BlockStack>
-                    </BlockStack>
-                  </Card>
-                </Layout.Section>
-              </Layout>
+            {selectedTab === 2 && (
+              <BlockStack gap="400">
+                <Text variant="headingMd">Global Custom CSS Override</Text>
+                <TextField
+                  label="Injected Storewide Styling Engine"
+                  value={globalCssState}
+                  onChange={setGlobalCssState}
+                  multiline={6}
+                  helpText="Enter valid CSS to apply over store badges globally."
+                />
+                <InlineStack align="end">
+                  <Button variant="primary" onClick={handleSaveSettings}>Save Engine Settings</Button>
+                </InlineStack>
+              </BlockStack>
             )}
           </Box>
-        </Tabs>
+        </Card>
+
+        {/* MODAL STUDIO EDITOR */}
+        <Modal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          title={formData.id === "new" ? "Build High-Converting Campaign Rule" : `Edit Rule: ${formData.name}`}
+          primaryAction={{
+            content: "Publish Campaign Live",
+            onAction: handleSaveForm,
+            loading: navigation.state === "submitting",
+          }}
+          secondaryActions={[{ content: "Cancel", onAction: () => setModalOpen(false) }]}
+          size="large"
+        >
+          <Modal.Section>
+            <Grid>
+              <Grid.Cell columnSpan={{ xs: 7, sm: 7, md: 7, lg: 7, xl: 7 }}>
+                <BlockStack gap="400">
+                  <Text variant="headingSm">Conversion Presets</Text>
+                  <InlineStack gap="200">
+                    <Button size="micro" onClick={() => handleApplyPreset("BLACK_FRIDAY")}>Black Friday</Button>
+                    <Button size="micro" onClick={() => handleApplyPreset("URGENCY")}>Urgency Scarcity</Button>
+                    <Button size="micro" onClick={() => handleApplyPreset("MINIMAL")}>Luxury Minimal</Button>
+                    <Button size="micro" onClick={() => handleApplyPreset("ECO")}>Eco Glassmorphism</Button>
+                  </InlineStack>
+
+                  <Divider />
+
+                  <TextField
+                    label="Campaign Internal Title"
+                    value={formData.name}
+                    onChange={(v) => setFormData((p) => ({ ...p, name: v }))}
+                  />
+
+                  <Grid>
+                    <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
+                      <TextField
+                        label="Display Badge Text"
+                        value={formData.text}
+                        onChange={(v) => setFormData((p) => ({ ...p, text: v }))}
+                      />
+                    </Grid.Cell>
+                    <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
+                      <TextField
+                        label="Emoji / Icon Prefix"
+                        value={formData.icon}
+                        onChange={(v) => setFormData((p) => ({ ...p, icon: v }))}
+                      />
+                    </Grid.Cell>
+                  </Grid>
+
+                  <Grid>
+                    <Grid.Cell columnSpan={{ xs: 4, sm: 4, md: 4, lg: 4, xl: 4 }}>
+                      <TextField
+                        label="Background Color"
+                        type="color"
+                        value={formData.bgColor}
+                        onChange={(v) => setFormData((p) => ({ ...p, bgColor: v }))}
+                      />
+                    </Grid.Cell>
+                    <Grid.Cell columnSpan={{ xs: 4, sm: 4, md: 4, lg: 4, xl: 4 }}>
+                      <TextField
+                        label="Text Color"
+                        type="color"
+                        value={formData.textColor}
+                        onChange={(v) => setFormData((p) => ({ ...p, textColor: v }))}
+                      />
+                    </Grid.Cell>
+                    <Grid.Cell columnSpan={{ xs: 4, sm: 4, md: 4, lg: 4, xl: 4 }}>
+                      <TextField
+                        label="Border Color"
+                        type="color"
+                        value={formData.borderColor}
+                        onChange={(v) => setFormData((p) => ({ ...p, borderColor: v }))}
+                      />
+                    </Grid.Cell>
+                  </Grid>
+
+                  <Grid>
+                    <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
+                      <Select
+                        label="Badge Style & Shape"
+                        options={[
+                          { label: "Capsule Pill", value: "PILL" },
+                          { label: "Sharp Square", value: "SHARP" },
+                          { label: "Outline Minimal", value: "OUTLINE" },
+                          { label: "Glassmorphism", value: "GLASSMORPHISM" },
+                        ]}
+                        value={formData.shape}
+                        onChange={(v) => setFormData((p) => ({ ...p, shape: v }))}
+                      />
+                    </Grid.Cell>
+                    <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
+                      <Select
+                        label="Grid Corner Placement"
+                        options={[
+                          { label: "Top Left", value: "TOP_LEFT" },
+                          { label: "Top Right", value: "TOP_RIGHT" },
+                          { label: "Bottom Left", value: "BOTTOM_LEFT" },
+                          { label: "Bottom Right", value: "BOTTOM_RIGHT" },
+                        ]}
+                        value={formData.position}
+                        onChange={(v) => setFormData((p) => ({ ...p, position: v }))}
+                      />
+                    </Grid.Cell>
+                  </Grid>
+
+                  <RangeSlider
+                    label="Font Size (PX)"
+                    value={formData.fontSize}
+                    min={8}
+                    max={20}
+                    onChange={(v) => setFormData((p) => ({ ...p, fontSize: v }))}
+                    output
+                  />
+
+                  <TextField
+                    label="Conflict Weight Priority (Higher Wins Overlap)"
+                    type="number"
+                    value={formData.priority.toString()}
+                    onChange={(v) => setFormData((p) => ({ ...p, priority: parseInt(v || "0", 10) }))}
+                  />
+
+                  <Divider />
+                  <Text variant="headingSm">Automated Algorithmic Targeting Engine</Text>
+
+                  <Select
+                    label="Trigger Condition"
+                    options={[
+                      { label: "All Products (Global Store)", value: "GLOBAL" },
+                      { label: "Selected Products Manual Selection", value: "SPECIFIC_PRODUCTS" },
+                      { label: "Product Tag Included", value: "PRODUCT_TAGS" },
+                      { label: "Inventory Scarcity Limit", value: "INVENTORY_LEVEL" },
+                      { label: "Price Range Filter", value: "PRICE_RANGE" },
+                    ]}
+                    value={formData.targetType}
+                    onChange={(v) => setFormData((p) => ({ ...p, targetType: v }))}
+                  />
+
+                  {formData.targetType === "SPECIFIC_PRODUCTS" && (
+                    <InlineStack gap="300" blockAlign="center">
+                      <Button onClick={handleResourcePicker}>Select Storefront Products</Button>
+                      <Text variant="bodySm">{formData.productIds.length} Items Attached</Text>
+                    </InlineStack>
+                  )}
+
+                  {formData.targetType === "PRODUCT_TAGS" && (
+                    <TextField
+                      label="Product Tag Targets (Comma Separated)"
+                      value={formData.targetTags}
+                      placeholder="e.g. sale, limited, trending"
+                      onChange={(v) => setFormData((p) => ({ ...p, targetTags: v }))}
+                    />
+                  )}
+
+                  {formData.targetType === "INVENTORY_LEVEL" && (
+                    <Grid>
+                      <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
+                        <TextField
+                          label="Min Stock Threshold"
+                          type="number"
+                          value={formData.minInventory.toString()}
+                          onChange={(v) => setFormData((p) => ({ ...p, minInventory: parseInt(v || "0", 10) }))}
+                        />
+                      </Grid.Cell>
+                      <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
+                        <TextField
+                          label="Max Stock Threshold"
+                          type="number"
+                          value={formData.maxInventory.toString()}
+                          onChange={(v) => setFormData((p) => ({ ...p, maxInventory: parseInt(v || "0", 10) }))}
+                        />
+                      </Grid.Cell>
+                    </Grid>
+                  )}
+
+                  {formData.targetType === "PRICE_RANGE" && (
+                    <Grid>
+                      <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
+                        <TextField
+                          label="Min Price ($)"
+                          type="number"
+                          value={formData.minPrice.toString()}
+                          onChange={(v) => setFormData((p) => ({ ...p, minPrice: parseFloat(v || "0") }))}
+                        />
+                      </Grid.Cell>
+                      <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
+                        <TextField
+                          label="Max Price ($)"
+                          type="number"
+                          value={formData.maxPrice.toString()}
+                          onChange={(v) => setFormData((p) => ({ ...p, maxPrice: parseFloat(v || "0") }))}
+                        />
+                      </Grid.Cell>
+                    </Grid>
+                  )}
+
+                  <TextField
+                    label="Custom Badge CSS Hacks"
+                    value={formData.customCss}
+                    multiline={3}
+                    placeholder="box-shadow: 0 0 10px rgba(255,0,0,0.5);"
+                    onChange={(v) => setFormData((p) => ({ ...p, customCss: v }))}
+                  />
+                </BlockStack>
+              </Grid.Cell>
+
+              {/* REALTIME CANVAS EDITOR */}
+              <Grid.Cell columnSpan={{ xs: 5, sm: 5, md: 5, lg: 5, xl: 5 }}>
+                <Box style={{ position: "sticky", top: "0px" }}>
+                  <Card>
+                    <BlockStack gap="300">
+                      <InlineStack align="space-between">
+                        <Text variant="headingSm">Live Store Simulator</Text>
+                        <InlineStack gap="100">
+                          <Button size="micro" pressed={previewTheme === "light"} onClick={() => setPreviewTheme("light")}>Light</Button>
+                          <Button size="micro" pressed={previewTheme === "dark"} onClick={() => setPreviewTheme("dark")}>Dark</Button>
+                        </InlineStack>
+                      </InlineStack>
+
+                      <Box
+                        padding="600"
+                        borderRadius="300"
+                        style={{
+                          backgroundColor: previewTheme === "light" ? "#F3F4F6" : "#111827",
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          minHeight: "280px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "200px",
+                            height: "240px",
+                            backgroundColor: previewTheme === "light" ? "#FFFFFF" : "#1F2937",
+                            borderRadius: "12px",
+                            overflow: "hidden",
+                            position: "relative",
+                            border: previewTheme === "light" ? "1px solid #E5E7EB" : "1px solid #374151",
+                          }}
+                        >
+                          <div style={{ width: "100%", height: "150px", backgroundColor: previewTheme === "light" ? "#E5E7EB" : "#374151", position: "relative" }}>
+                            <div
+                              style={{
+                                position: "absolute",
+                                backgroundColor: formData.shape === "OUTLINE" ? "transparent" : formData.bgColor,
+                                color: formData.shape === "OUTLINE" ? formData.bgColor : formData.textColor,
+                                border: `1px solid ${formData.borderColor}`,
+                                borderRadius: formData.shape === "PILL" ? "20px" : formData.shape === "SHARP" ? "0px" : `${formData.borderRadius}px`,
+                                padding: `${formData.paddingY}px ${formData.paddingX}px`,
+                                fontSize: `${formData.fontSize}px`,
+                                fontWeight: "bold",
+                                top: formData.position.includes("TOP") ? "8px" : "auto",
+                                bottom: formData.position.includes("BOTTOM") ? "8px" : "auto",
+                                left: formData.position.includes("LEFT") ? "8px" : "auto",
+                                right: formData.position.includes("RIGHT") ? "8px" : "auto",
+                                backdropFilter: formData.shape === "GLASSMORPHISM" ? "blur(8px)" : "none",
+                              }}
+                            >
+                              {formData.icon} {formData.text}
+                            </div>
+                          </div>
+                          <div style={{ padding: "10px" }}>
+                            <div style={{ height: "10px", width: "80%", backgroundColor: previewTheme === "light" ? "#D1D5DB" : "#4B5563", borderRadius: "4px", marginBottom: "6px" }} />
+                            <div style={{ height: "12px", width: "40%", backgroundColor: previewTheme === "light" ? "#111827" : "#F9FAFB", borderRadius: "4px" }} />
+                          </div>
+                        </div>
+                      </Box>
+                    </BlockStack>
+                  </Card>
+                </Box>
+              </Grid.Cell>
+            </Grid>
+          </Modal.Section>
+        </Modal>
       </BlockStack>
     </Page>
   );
