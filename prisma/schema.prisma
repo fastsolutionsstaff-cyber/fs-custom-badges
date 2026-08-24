@@ -28,13 +28,13 @@ model Session {
 }
 
 model AppSettings {
-  id               String   @id @default(uuid())
-  shop             String   @unique
-  badgeLimit       Int      @default(10)
-  globalCustomCss  String?  @default("")
-  enableAnalytics  Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              String   @id @default(uuid())
+  shop            String   @unique
+  badgeLimit      Int      @default(10)
+  globalCustomCss String?  @default("")
+  enableAnalytics Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 enum TargetType {
@@ -85,6 +85,10 @@ model Badge {
   paddingX         Int            @default(10)
   borderRadius     Int            @default(20)
   customCss        String?        @default("")
+
+  // Device Visibility Controls
+  hideOnMobile     Boolean        @default(false)
+  hideOnDesktop    Boolean        @default(false)
   
   // Advanced Rules & Targeting Engine
   targetType       TargetType     @default(GLOBAL)

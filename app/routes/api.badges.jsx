@@ -47,6 +47,8 @@ export const loader = async ({ request }) => {
       minPrice: b.minPrice,
       maxPrice: b.maxPrice,
       customCss: b.customCss,
+      hideOnMobile: b.hideOnMobile ?? false,
+      hideOnDesktop: b.hideOnDesktop ?? false,
       productIds: b.products.map((p) => p.productId.replace(/\D/g, "")),
     }));
 

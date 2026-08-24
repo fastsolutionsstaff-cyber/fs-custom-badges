@@ -1,9 +1,8 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState } from "react";
 import { json } from "@remix-run/node";
 import { useLoaderData, useSubmit, useNavigation, useActionData } from "@remix-run/react";
 import {
   Page,
-  Layout,
   Card,
   Tabs,
   TextField,
@@ -21,25 +20,12 @@ import {
   Grid,
   IndexTable,
   Modal,
-  Icon,
-  Tooltip,
-  ColorPicker,
-  Popover,
-  DataTable,
-  ResourceList,
-  ResourceItem,
-  Avatar,
-  DropZone
 } from "@shopify/polaris";
 import {
   PlusIcon,
   EditIcon,
   DeleteIcon,
-  MagicIcon,
-  AnalyticsIcon,
-  SettingsIcon,
   DuplicateIcon,
-  AlertCircleIcon
 } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server.js";
 import db from "../db.server.js";
@@ -67,12 +53,15 @@ export const loader = async ({ request }) => {
         text: "LIMITED DEAL",
         bgColor: "#DC2626",
         textColor: "#FFFFFF",
+        borderColor: "#991B1B",
         position: "TOP_LEFT",
         shape: "PILL",
         icon: "⚡",
         targetType: "GLOBAL",
         priority: 10,
         enabled: true,
+        hideOnMobile: false,
+        hideOnDesktop: false,
       },
       include: { products: true },
     });
@@ -84,8 +73,8 @@ export const loader = async ({ request }) => {
     productIds: b.products.map((p) => p.productId),
   }));
 
-  const totalImpressions = formattedBadges.reduce((acc, b) => acc + b.impressions, 0);
-  const totalClicks = formattedBadges.reduce((acc, b) => acc + b.clicks, 0);
+  const totalImpressions = formattedBadges.reduce((acc, b) => acc + (b.impressions || 0), 0);
+  const totalClicks = formattedBadges.reduce((acc, b) => acc + (b.clicks || 0), 0);
   const avgCtr = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : "0.00";
 
   return json({ shop, settings, badges: formattedBadges, analytics: { totalImpressions, totalClicks, avgCtr } });
@@ -147,6 +136,8 @@ export const action = async ({ request }) => {
   const minPrice = parseFloat(formData.get("minPrice") || "0");
   const maxPrice = parseFloat(formData.get("maxPrice") || "99999");
   const customCss = formData.get("customCss") || "";
+  const hideOnMobile = formData.get("hideOnMobile") === "true";
+  const hideOnDesktop = formData.get("hideOnDesktop") === "true";
   const productIds = JSON.parse(formData.get("productIds") || "[]");
 
   await db.$transaction(async (tx) => {
@@ -173,7 +164,9 @@ export const action = async ({ request }) => {
       maxInventory,
       minPrice,
       maxPrice,
-      customCss
+      customCss,
+      hideOnMobile,
+      hideOnDesktop,
     };
 
     if (id && id !== "new") {
@@ -194,7 +187,7 @@ export const action = async ({ request }) => {
 };
 
 export default function SaaSAdminApp() {
-  const { shop, settings, badges, analytics } = useLoaderData();
+  const { settings, badges, analytics } = useLoaderData();
   const actionData = useActionData();
   const submit = useSubmit();
   const navigation = useNavigation();
@@ -226,15 +219,20 @@ export default function SaaSAdminApp() {
     minPrice: 0,
     maxPrice: 1000,
     customCss: "",
+    hideOnMobile: false,
+    hideOnDesktop: false,
     productIds: []
   });
 
-  const [previewViewport, setPreviewViewport] = useState("desktop");
   const [previewTheme, setPreviewTheme] = useState("light");
 
   const handleOpenModal = (badge = null) => {
     if (badge) {
-      setFormData({ ...badge });
+      setFormData({
+        ...badge,
+        hideOnMobile: badge.hideOnMobile ?? false,
+        hideOnDesktop: badge.hideOnDesktop ?? false,
+      });
     } else {
       setFormData({
         id: "new",
@@ -259,6 +257,8 @@ export default function SaaSAdminApp() {
         minPrice: 0,
         maxPrice: 99999,
         customCss: "",
+        hideOnMobile: false,
+        hideOnDesktop: false,
         productIds: []
       });
     }
@@ -383,7 +383,7 @@ export default function SaaSAdminApp() {
                   { title: "Badge Render Preview" },
                   { title: "Campaign Name" },
                   { title: "Priority Engine" },
-                  { title: "Target Condition" },
+                  { title: "Visibility" },
                   { title: "Analytics (CTR)" },
                   { title: "Actions" },
                 ]}
@@ -420,7 +420,11 @@ export default function SaaSAdminApp() {
                         <PolarisBadge tone="attention">Weight: {b.priority}</PolarisBadge>
                       </IndexTable.Cell>
                       <IndexTable.Cell>
-                        <Text variant="bodySm">{b.targetType}</Text>
+                        <InlineStack gap="100">
+                          {b.hideOnMobile && <PolarisBadge tone="warn">Mobile Hidden</PolarisBadge>}
+                          {b.hideOnDesktop && <PolarisBadge tone="warn">Desktop Hidden</PolarisBadge>}
+                          {!b.hideOnMobile && !b.hideOnDesktop && <PolarisBadge tone="info">All Devices</PolarisBadge>}
+                        </InlineStack>
                       </IndexTable.Cell>
                       <IndexTable.Cell>
                         <Text variant="bodySm">{b.clicks} / {b.impressions} ({ctr}%)</Text>
@@ -578,6 +582,22 @@ export default function SaaSAdminApp() {
                     onChange={(v) => setFormData((p) => ({ ...p, fontSize: v }))}
                     output
                   />
+
+                  {/* DEVICE VISIBILITY CONTROL CHECKBOXES */}
+                  <Divider />
+                  <Text variant="headingSm">Device Display Settings</Text>
+                  <InlineStack gap="400">
+                    <Checkbox
+                      label="Hide on Mobile Devices"
+                      checked={formData.hideOnMobile}
+                      onChange={(newVal) => setFormData((p) => ({ ...p, hideOnMobile: newVal }))}
+                    />
+                    <Checkbox
+                      label="Hide on Desktop Devices"
+                      checked={formData.hideOnDesktop}
+                      onChange={(newVal) => setFormData((p) => ({ ...p, hideOnDesktop: newVal }))}
+                    />
+                  </InlineStack>
 
                   <TextField
                     label="Conflict Weight Priority (Higher Wins Overlap)"

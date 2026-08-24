@@ -1,6 +1,5 @@
 <script>
   (function () {
-    // PDP page par App Block kaam karega, isliye PDP script bypass
     if (window.location.pathname.includes('/products/')) return;
 
     const API_ENDPOINT = '/apps/badges';
@@ -14,6 +13,7 @@
         const { badges, globalCustomCss } = await res.json();
         if (!badges || badges.length === 0) return;
 
+        // Apply Global Custom CSS if provided
         if (globalCustomCss) {
           const styleTag = document.createElement('style');
           styleTag.innerHTML = globalCustomCss;
@@ -32,8 +32,8 @@
 
           for (const badge of badges) {
             if (isEligible(badge, productId, tags, price, inventory)) {
-              renderBadgeOnCard(card, badge);
-              break; // Top priority badge applied
+              renderBadgeOnCard(card, badge, productId);
+              break; // Highest priority badge wins
             }
           }
         });
@@ -53,7 +53,8 @@
     }
 
     function isEligible(badge, productId, tags, price, inventory) {
-      if (badge.isActive === false) return false;
+      // Direct Status Check: If disabled in dashboard, do not display on store
+      if (badge.isActive === false || badge.status === 'INACTIVE') return false;
 
       const targetType = badge.targetType || (badge.isGlobal ? 'GLOBAL' : '');
       
@@ -83,7 +84,7 @@
       return false;
     }
 
-    function renderBadgeOnCard(card, badge) {
+    function renderBadgeOnCard(card, badge, productId) {
       if (card.querySelector(`[data-badge-id="${badge.id}"]`)) return;
 
       const mediaElement = card.querySelector('.card__media, .media, .product-card__image-wrapper') || card;
@@ -139,7 +140,7 @@
 
       mediaElement.appendChild(el);
 
-      // Impression Track
+      // Track Impression
       fetch(API_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

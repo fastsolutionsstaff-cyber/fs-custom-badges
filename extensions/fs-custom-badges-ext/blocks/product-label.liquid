@@ -88,7 +88,7 @@
     if (!productId) return;
 
     function isEligible(badge) {
-      if (badge.isActive === false) return false;
+      if (badge.isActive === false || badge.status === 'INACTIVE') return false;
 
       const targetType = badge.targetType || (badge.isGlobal ? 'GLOBAL' : '');
 
@@ -280,4 +280,4 @@
     }
   ]
 }
-{% endschema %}s
+{% endschema %}
