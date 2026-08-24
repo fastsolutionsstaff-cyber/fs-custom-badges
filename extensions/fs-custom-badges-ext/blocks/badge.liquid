@@ -1,158 +1,1068 @@
 <script>
   (function () {
-    if (window.location.pathname.includes('/products/')) return;
+    "use strict";
 
-    const API_ENDPOINT = '/apps/badges';
+    /*
+     * ============================================================
+     * FS CUSTOM BADGES — STOREFRONT BADGE ENGINE
+     * ============================================================
+     *
+     * Handles:
+     * - Homepage product grids
+     * - Collection product grids
+     * - Search product grids
+     * - Product recommendations
+     * - Dynamic Shopify sections
+     * - Global badges
+     * - Specific product badges
+     * - Product tag badges
+     * - Inventory badges
+     * - Price range badges
+     * - Mobile / desktop visibility
+     * - Priority
+     * - Custom CSS
+     * - Impression tracking
+     * - Click tracking
+     */
 
-    async function initBadgeEngine() {
+    if (window.location.pathname.includes("/products/")) {
+      return;
+    }
+
+    const API_ENDPOINT = "/apps/badges";
+    const SHOP_DOMAIN = "{{ shop.permanent_domain }}";
+
+    let badgeConfiguration = [];
+    let engineInitialized = false;
+
+    /*
+     * ------------------------------------------------------------
+     * Load badge configuration
+     * ------------------------------------------------------------
+     */
+
+    async function loadBadges() {
       try {
-        const shop = "{{ shop.permanent_domain }}";
-        const res = await fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(shop)}`);
-        if (!res.ok) return;
-
-        const { badges, globalCustomCss } = await res.json();
-        if (!badges || badges.length === 0) return;
-
-        // Apply Global Custom CSS if provided
-        if (globalCustomCss) {
-          const styleTag = document.createElement('style');
-          styleTag.innerHTML = globalCustomCss;
-          document.head.appendChild(styleTag);
-        }
-
-        const productCards = document.querySelectorAll(
-          '.card-wrapper, .card, .grid__item, product-card, .product-card, [data-product-id]'
+        const response = await fetch(
+          `${API_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`,
+          {
+            method: "GET",
+            credentials: "same-origin",
+            cache: "no-store"
+          }
         );
 
-        productCards.forEach((card) => {
-          const productId = getProductId(card);
-          const tags = card.dataset.tags ? card.dataset.tags.toLowerCase().split(',').map(t => t.trim()) : [];
-          const price = parseFloat(card.dataset.price || '0');
-          const inventory = parseInt(card.dataset.inventory || '999', 10);
+        if (!response.ok) {
+          console.warn(
+            "[FS Custom Badges] API request failed:",
+            response.status
+          );
+          return false;
+        }
 
-          for (const badge of badges) {
-            if (isEligible(badge, productId, tags, price, inventory)) {
-              renderBadgeOnCard(card, badge, productId);
-              break; // Highest priority badge wins
-            }
+        const data = await response.json();
+
+        badgeConfiguration = Array.isArray(data.badges)
+          ? data.badges
+          : [];
+
+        /*
+         * Apply global CSS once.
+         */
+        if (
+          data.globalCustomCss &&
+          !document.getElementById("fs-custom-badges-global-css")
+        ) {
+          const style = document.createElement("style");
+
+          style.id = "fs-custom-badges-global-css";
+          style.textContent = data.globalCustomCss;
+
+          document.head.appendChild(style);
+        }
+
+        return true;
+      } catch (error) {
+        console.error(
+          "[FS Custom Badges] Failed to load badges:",
+          error
+        );
+
+        return false;
+      }
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Product card detection
+     * ------------------------------------------------------------
+     */
+
+    function getProductCards() {
+      const selectors = [
+        ".card-wrapper",
+        ".card.product-card",
+        ".product-card",
+        "product-card",
+        ".grid__item .card",
+        ".grid__item"
+      ];
+
+      const cards = new Set();
+
+      selectors.forEach((selector) => {
+        document
+          .querySelectorAll(selector)
+          .forEach((element) => cards.add(element));
+      });
+
+      return Array.from(cards);
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Extract Shopify product information
+     * ------------------------------------------------------------
+     */
+
+    function getProductData(card) {
+      let productId = null;
+      let productHandle = null;
+
+      /*
+       * 1. Existing data attributes.
+       */
+      if (card.dataset.productId) {
+        productId = normalizeProductId(card.dataset.productId);
+      }
+
+      /*
+       * 2. Shopify product card links.
+       */
+      const productLink = card.querySelector(
+        'a[href*="/products/"]'
+      );
+
+      if (productLink) {
+        const href = productLink.getAttribute("href") || "";
+
+        const match = href.match(
+          /\/products\/([^/?#]+)/i
+        );
+
+        if (match) {
+          productHandle = match[1];
+
+          /*
+           * Sometimes the URL contains a variant ID.
+           */
+          const variantMatch = href.match(
+            /[?&]variant=(\d+)/i
+          );
+
+          if (variantMatch && !productId) {
+            productId = normalizeProductId(
+              variantMatch[1]
+            );
           }
-        });
-      } catch (err) {
-        console.error("Badge Engine Error:", err);
+        }
       }
+
+      /*
+       * 3. Try common Shopify product JSON attributes.
+       */
+      if (!productId) {
+        const possibleIdElements = [
+          "[data-product-id]",
+          "[data-product]",
+          "[data-product-handle]"
+        ];
+
+        for (const selector of possibleIdElements) {
+          const element = card.querySelector(selector);
+
+          if (!element) continue;
+
+          const possibleId =
+            element.dataset.productId ||
+            element.dataset.product;
+
+          if (possibleId) {
+            productId = normalizeProductId(
+              possibleId
+            );
+
+            if (productId) break;
+          }
+        }
+      }
+
+      /*
+       * Price.
+       *
+       * Dawn product cards commonly contain:
+       * .price-item--regular
+       */
+      let price = 0;
+
+      const priceElement = card.querySelector(
+        ".price-item--regular, .price__regular .price-item, .price-item"
+      );
+
+      if (priceElement) {
+        price = parseMoney(
+          priceElement.textContent
+        );
+      }
+
+      /*
+       * Existing data price takes priority.
+       */
+      if (card.dataset.price) {
+        const parsedPrice = parseFloat(
+          card.dataset.price
+        );
+
+        if (!Number.isNaN(parsedPrice)) {
+          price = parsedPrice;
+        }
+      }
+
+      /*
+       * Tags.
+       *
+       * We cannot reliably read product tags from normal
+       * storefront HTML unless the theme exposes them.
+       *
+       * data-tags is therefore supported when available.
+       */
+      let tags = [];
+
+      if (card.dataset.tags) {
+        tags = card.dataset.tags
+          .split(",")
+          .map((tag) =>
+            tag.trim().toLowerCase()
+          )
+          .filter(Boolean);
+      }
+
+      /*
+       * Inventory.
+       *
+       * Use theme-provided data if available.
+       * Otherwise use a large value so normal badges
+       * are not accidentally hidden.
+       */
+      let inventory = 999999;
+
+      if (card.dataset.inventory) {
+        const parsedInventory = parseInt(
+          card.dataset.inventory,
+          10
+        );
+
+        if (!Number.isNaN(parsedInventory)) {
+          inventory = parsedInventory;
+        }
+      }
+
+      return {
+        productId,
+        productHandle,
+        tags,
+        price,
+        inventory
+      };
     }
 
-    function getProductId(card) {
-      if (card.dataset.productId) return String(card.dataset.productId).replace(/\D/g, '');
-      const anchor = card.querySelector('a[href*="/products/"]');
-      if (anchor) {
-        const match = anchor.href.match(/products\/([^/?#]+)/);
-        if (match) return match[1];
-      }
-      return null;
+    /*
+     * ------------------------------------------------------------
+     * Normalize Shopify Product ID
+     * ------------------------------------------------------------
+     */
+
+    function normalizeProductId(value) {
+      if (!value) return null;
+
+      const stringValue = String(value);
+
+      const match = stringValue.match(
+        /(\d+)(?!.*\d)/
+      );
+
+      return match ? match[1] : null;
     }
 
-    function isEligible(badge, productId, tags, price, inventory) {
-      // Direct Status Check: If disabled in dashboard, do not display on store
-      if (badge.isActive === false || badge.status === 'INACTIVE') return false;
+    /*
+     * ------------------------------------------------------------
+     * Parse money displayed by Shopify
+     * ------------------------------------------------------------
+     */
 
-      const targetType = badge.targetType || (badge.isGlobal ? 'GLOBAL' : '');
-      
-      if (targetType === 'GLOBAL') return true;
+    function parseMoney(value) {
+      if (!value) return 0;
 
-      if (targetType === 'SPECIFIC_PRODUCTS' && productId && Array.isArray(badge.productIds)) {
-        return badge.productIds.some(id => String(id).replace(/\D/g, '') === String(productId));
+      let cleaned = String(value)
+        .replace(/[^\d.,-]/g, "")
+        .trim();
+
+      if (!cleaned) return 0;
+
+      /*
+       * Handle formats such as:
+       * 1,299.00
+       * 1.299,00
+       * 1299.00
+       */
+
+      if (
+        cleaned.includes(",") &&
+        cleaned.includes(".")
+      ) {
+        const lastComma =
+          cleaned.lastIndexOf(",");
+
+        const lastDot =
+          cleaned.lastIndexOf(".");
+
+        if (lastComma > lastDot) {
+          cleaned = cleaned
+            .replace(/\./g, "")
+            .replace(",", ".");
+        } else {
+          cleaned = cleaned.replace(/,/g, "");
+        }
+      } else if (cleaned.includes(",")) {
+        const parts = cleaned.split(",");
+
+        if (
+          parts.length === 2 &&
+          parts[1].length <= 2
+        ) {
+          cleaned = cleaned.replace(",", ".");
+        } else {
+          cleaned = cleaned.replace(/,/g, "");
+        }
       }
 
-      if (targetType === 'PRODUCT_TAGS' && Array.isArray(badge.targetTags)) {
-        const formattedTargetTags = badge.targetTags.map(t => String(t).toLowerCase().trim());
-        return tags.some(t => formattedTargetTags.includes(t));
+      const number = parseFloat(cleaned);
+
+      return Number.isNaN(number)
+        ? 0
+        : number;
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Check device visibility
+     * ------------------------------------------------------------
+     */
+
+    function isDeviceEligible(badge) {
+      const isMobile =
+        window.matchMedia(
+          "(max-width: 749px)"
+        ).matches;
+
+      if (
+        isMobile &&
+        badge.hideOnMobile === true
+      ) {
+        return false;
       }
 
-      if (targetType === 'INVENTORY_LEVEL') {
-        const min = badge.minInventory ?? 0;
-        const max = badge.maxInventory ?? Infinity;
-        return inventory >= min && inventory <= max;
+      if (
+        !isMobile &&
+        badge.hideOnDesktop === true
+      ) {
+        return false;
       }
 
-      if (targetType === 'PRICE_RANGE') {
-        const min = badge.minPrice ?? 0;
-        const max = badge.maxPrice ?? Infinity;
-        return price >= min && price <= max;
+      return true;
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Check badge targeting rules
+     * ------------------------------------------------------------
+     */
+
+    function isEligible(
+      badge,
+      productData
+    ) {
+      /*
+       * Dashboard enabled/disabled control.
+       */
+      if (badge.enabled !== true) {
+        return false;
+      }
+
+      /*
+       * Device visibility.
+       */
+      if (!isDeviceEligible(badge)) {
+        return false;
+      }
+
+      const targetType =
+        badge.targetType || "GLOBAL";
+
+      /*
+       * GLOBAL
+       */
+      if (targetType === "GLOBAL") {
+        return true;
+      }
+
+      /*
+       * SPECIFIC PRODUCTS
+       */
+      if (
+        targetType === "SPECIFIC_PRODUCTS"
+      ) {
+        if (
+          !productData.productId ||
+          !Array.isArray(badge.productIds)
+        ) {
+          return false;
+        }
+
+        return badge.productIds.some(
+          (id) =>
+            normalizeProductId(id) ===
+            productData.productId
+        );
+      }
+
+      /*
+       * PRODUCT TAGS
+       */
+      if (
+        targetType === "PRODUCT_TAGS"
+      ) {
+        if (
+          !Array.isArray(badge.targetTags) ||
+          badge.targetTags.length === 0
+        ) {
+          return false;
+        }
+
+        return productData.tags.some(
+          (tag) =>
+            badge.targetTags.includes(
+              String(tag)
+                .trim()
+                .toLowerCase()
+            )
+        );
+      }
+
+      /*
+       * INVENTORY LEVEL
+       */
+      if (
+        targetType === "INVENTORY_LEVEL"
+      ) {
+        const min =
+          Number(badge.minInventory ?? 0);
+
+        const max =
+          Number(
+            badge.maxInventory ?? 999999
+          );
+
+        return (
+          productData.inventory >= min &&
+          productData.inventory <= max
+        );
+      }
+
+      /*
+       * PRICE RANGE
+       */
+      if (
+        targetType === "PRICE_RANGE"
+      ) {
+        const min =
+          Number(badge.minPrice ?? 0);
+
+        const max =
+          Number(
+            badge.maxPrice ?? 999999999
+          );
+
+        return (
+          productData.price >= min &&
+          productData.price <= max
+        );
       }
 
       return false;
     }
 
-    function renderBadgeOnCard(card, badge, productId) {
-      if (card.querySelector(`[data-badge-id="${badge.id}"]`)) return;
+    /*
+     * ------------------------------------------------------------
+     * Find media/image area
+     * ------------------------------------------------------------
+     */
 
-      const mediaElement = card.querySelector('.card__media, .media, .product-card__image-wrapper') || card;
-      if (getComputedStyle(mediaElement).position === 'static') {
-        mediaElement.style.position = 'relative';
+    function getMediaElement(card) {
+      return (
+        card.querySelector(
+          ".card__media"
+        ) ||
+        card.querySelector(
+          ".media"
+        ) ||
+        card.querySelector(
+          ".product-card__image-wrapper"
+        ) ||
+        card.querySelector(
+          ".card__inner"
+        ) ||
+        card
+      );
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Remove previously rendered badge
+     * ------------------------------------------------------------
+     */
+
+    function removeExistingBadges(card) {
+      card
+        .querySelectorAll(
+          ".fs-custom-storefront-badge"
+        )
+        .forEach((badge) => {
+          badge.remove();
+        });
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Render badge
+     * ------------------------------------------------------------
+     */
+
+    function renderBadge(
+      card,
+      badge,
+      productData
+    ) {
+      const mediaElement =
+        getMediaElement(card);
+
+      if (!mediaElement) return;
+
+      /*
+       * Don't create duplicate badges.
+       */
+      if (
+        mediaElement.querySelector(
+          `[data-fs-badge-id="${badge.id}"]`
+        )
+      ) {
+        return;
       }
 
-      const el = document.createElement('div');
-      el.className = 'saas-engine-badge';
-      el.dataset.badgeId = badge.id;
-      el.innerHTML = `${badge.icon ? `<span class="fs-badge-icon">${badge.icon}</span> ` : ''}<span>${badge.text}</span>`;
+      /*
+       * Make media container position relative.
+       */
+      const computedStyle =
+        window.getComputedStyle(
+          mediaElement
+        );
 
-      let posStyles = 'top: 8px; left: 8px;';
-      if (badge.position === 'TOP_RIGHT') posStyles = 'top: 8px; right: 8px;';
-      if (badge.position === 'BOTTOM_LEFT') posStyles = 'bottom: 8px; left: 8px;';
-      if (badge.position === 'BOTTOM_RIGHT') posStyles = 'bottom: 8px; right: 8px;';
+      if (
+        computedStyle.position ===
+        "static"
+      ) {
+        mediaElement.style.position =
+          "relative";
+      }
 
-      const isOutline = badge.shape === 'OUTLINE' || badge.shape === 'outline';
-      const isPill = badge.shape === 'PILL' || badge.shape === 'pill';
-      const isSharp = badge.shape === 'SHARP' || badge.shape === 'sharp';
+      const badgeElement =
+        document.createElement("div");
 
-      const bgColor = badge.bgColor || '#111111';
-      const textColor = badge.textColor || '#FFFFFF';
+      badgeElement.className =
+        "fs-custom-storefront-badge";
 
-      el.style.cssText = `
+      badgeElement.dataset.fsBadgeId =
+        badge.id;
+
+      /*
+       * Position
+       */
+      let positionStyle =
+        "top: 10px; left: 10px;";
+
+      switch (badge.position) {
+        case "TOP_RIGHT":
+          positionStyle =
+            "top: 10px; right: 10px;";
+          break;
+
+        case "BOTTOM_LEFT":
+          positionStyle =
+            "bottom: 10px; left: 10px;";
+          break;
+
+        case "BOTTOM_RIGHT":
+          positionStyle =
+            "bottom: 10px; right: 10px;";
+          break;
+
+        case "CENTER_OVERLAY":
+          positionStyle =
+            "top: 50%; left: 50%; transform: translate(-50%, -50%);";
+          break;
+
+        default:
+          break;
+      }
+
+      /*
+       * Shape
+       */
+      const shape =
+        String(
+          badge.shape || "PILL"
+        ).toUpperCase();
+
+      let radius =
+        `${badge.borderRadius || 8}px`;
+
+      if (shape === "PILL") {
+        radius = "999px";
+      }
+
+      if (shape === "SHARP") {
+        radius = "0px";
+      }
+
+      /*
+       * Outline
+       */
+      const isOutline =
+        shape === "OUTLINE";
+
+      /*
+       * Glassmorphism
+       */
+      const isGlass =
+        shape === "GLASSMORPHISM";
+
+      /*
+       * Colors
+       */
+      const bgColor =
+        badge.bgColor || "#111827";
+
+      const textColor =
+        badge.textColor || "#FFFFFF";
+
+      const borderColor =
+        badge.borderColor ||
+        bgColor;
+
+      badgeElement.style.cssText = `
         position: absolute;
-        ${posStyles}
-        background-color: ${isOutline ? 'transparent' : bgColor};
-        color: ${isOutline ? bgColor : textColor};
-        border: ${isOutline ? `2px solid ${bgColor}` : `1px solid ${badge.borderColor || 'transparent'}`};
-        border-radius: ${isPill ? '50px' : isSharp ? '0px' : `${badge.borderRadius || 6}px`};
-        padding: ${badge.paddingY || 4}px ${badge.paddingX || 10}px;
-        font-size: ${badge.fontSize || 11}px;
-        font-weight: 700;
-        text-transform: uppercase;
-        z-index: 25;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-        cursor: pointer;
-        line-height: 1.2;
+        ${positionStyle}
+
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        ${badge.customCss || ''}
+        justify-content: center;
+        gap: 5px;
+
+        padding: ${badge.paddingY || 4}px ${badge.paddingX || 10}px;
+
+        min-height: 20px;
+
+        background: ${
+          isOutline
+            ? "transparent"
+            : isGlass
+            ? `${bgColor}CC`
+            : bgColor
+        };
+
+        color: ${
+          isOutline
+            ? bgColor
+            : textColor
+        };
+
+        border: ${
+          isOutline
+            ? `1.5px solid ${bgColor}`
+            : `1px solid ${borderColor}`
+        };
+
+        border-radius: ${radius};
+
+        font-size: ${
+          badge.fontSize || 11
+        }px;
+
+        font-weight: ${
+          badge.fontWeight || "700"
+        };
+
+        line-height: 1.2;
+
+        letter-spacing: 0.2px;
+
+        text-transform: uppercase;
+
+        white-space: nowrap;
+
+        z-index: 20;
+
+        box-sizing: border-box;
+
+        pointer-events: auto;
+
+        cursor: pointer;
+
+        box-shadow:
+          0 3px 10px rgba(0,0,0,0.12);
+
+        ${
+          isGlass
+            ? "backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);"
+            : ""
+        }
+
+        ${
+          badge.customCss
+            ? badge.customCss
+            : ""
+        }
       `;
 
-      el.addEventListener('click', () => {
-        fetch(API_ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ badgeId: badge.id, eventType: 'CLICK', productId }),
-        });
-      });
+      /*
+       * Icon
+       */
+      if (badge.icon) {
+        const icon =
+          document.createElement("span");
 
-      mediaElement.appendChild(el);
+        icon.className =
+          "fs-custom-badge-icon";
 
-      // Track Impression
-      fetch(API_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ badgeId: badge.id, eventType: 'IMPRESSION', productId }),
+        icon.textContent =
+          badge.icon;
+
+        icon.style.cssText = `
+          display: inline-flex;
+          align-items: center;
+          line-height: 1;
+        `;
+
+        badgeElement.appendChild(icon);
+      }
+
+      /*
+       * Text
+       */
+      const text =
+        document.createElement("span");
+
+      text.className =
+        "fs-custom-badge-text";
+
+      text.textContent =
+        badge.text || "BADGE";
+
+      badgeElement.appendChild(text);
+
+      /*
+       * Click tracking.
+       */
+      badgeElement.addEventListener(
+        "click",
+        function () {
+          trackEvent(
+            badge.id,
+            "CLICK",
+            productData.productId
+          );
+        }
+      );
+
+      mediaElement.appendChild(
+        badgeElement
+      );
+
+      /*
+       * Impression tracking.
+       */
+      trackEvent(
+        badge.id,
+        "IMPRESSION",
+        productData.productId
+      );
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Analytics
+     * ------------------------------------------------------------
+     */
+
+    function trackEvent(
+      badgeId,
+      eventType,
+      productId
+    ) {
+      try {
+        fetch(
+          `${API_ENDPOINT}?shop=${encodeURIComponent(
+            SHOP_DOMAIN
+          )}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json"
+            },
+            keepalive: true,
+            body: JSON.stringify({
+              badgeId,
+              eventType,
+              productId
+            })
+          }
+        ).catch(() => {});
+      } catch (error) {
+        /*
+         * Analytics should never break
+         * the storefront badge engine.
+         */
+      }
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Render all product cards
+     * ------------------------------------------------------------
+     */
+
+    function renderAllBadges() {
+      if (
+        !badgeConfiguration ||
+        badgeConfiguration.length === 0
+      ) {
+        return;
+      }
+
+      const cards =
+        getProductCards();
+
+      if (!cards.length) {
+        return;
+      }
+
+      cards.forEach((card) => {
+        /*
+         * Ignore cards that are not actual
+         * product cards.
+         */
+        const productData =
+          getProductData(card);
+
+        /*
+         * If there is no product link and
+         * no product ID, skip it.
+         */
+        if (
+          !productData.productId &&
+          !productData.productHandle
+        ) {
+          return;
+        }
+
+        /*
+         * Remove old badge before rebuilding.
+         * This prevents stale settings after
+         * Shopify section updates.
+         */
+        removeExistingBadges(card);
+
+        /*
+         * Badges are already sorted by priority
+         * from API.
+         */
+        const matchingBadge =
+          badgeConfiguration.find(
+            (badge) =>
+              isEligible(
+                badge,
+                productData
+              )
+          );
+
+        if (matchingBadge) {
+          renderBadge(
+            card,
+            matchingBadge,
+            productData
+          );
+        }
       });
     }
 
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initBadgeEngine);
+    /*
+     * ------------------------------------------------------------
+     * Initialize engine
+     * ------------------------------------------------------------
+     */
+
+    async function initialize() {
+      if (engineInitialized) {
+        renderAllBadges();
+        return;
+      }
+
+      engineInitialized = true;
+
+      const loaded =
+        await loadBadges();
+
+      if (!loaded) return;
+
+      renderAllBadges();
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Shopify section rendering support
+     * ------------------------------------------------------------
+     */
+
+    document.addEventListener(
+      "shopify:section:load",
+      function () {
+        setTimeout(
+          renderAllBadges,
+          150
+        );
+      }
+    );
+
+    document.addEventListener(
+      "shopify:section:reorder",
+      function () {
+        setTimeout(
+          renderAllBadges,
+          150
+        );
+      }
+    );
+
+    document.addEventListener(
+      "shopify:section:select",
+      function () {
+        setTimeout(
+          renderAllBadges,
+          150
+        );
+      }
+    );
+
+    /*
+     * ------------------------------------------------------------
+     * MutationObserver
+     *
+     * Handles:
+     * - Shopify filters
+     * - AJAX pagination
+     * - Infinite scroll
+     * - Dynamic product grids
+     * ------------------------------------------------------------
+     */
+
+    let renderTimeout = null;
+
+    const observer =
+      new MutationObserver(
+        function () {
+          clearTimeout(
+            renderTimeout
+          );
+
+          renderTimeout =
+            setTimeout(
+              renderAllBadges,
+              250
+            );
+        }
+      );
+
+    /*
+     * Start observer after DOM exists.
+     */
+    function startObserver() {
+      if (!document.body) return;
+
+      observer.observe(
+        document.body,
+        {
+          childList: true,
+          subtree: true
+        }
+      );
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Start
+     * ------------------------------------------------------------
+     */
+
+    if (
+      document.readyState ===
+      "loading"
+    ) {
+      document.addEventListener(
+        "DOMContentLoaded",
+        function () {
+          initialize();
+          startObserver();
+        }
+      );
     } else {
-      initBadgeEngine();
+      initialize();
+      startObserver();
     }
+
+    /*
+     * ------------------------------------------------------------
+     * Resize support
+     * ------------------------------------------------------------
+     */
+
+    let resizeTimeout;
+
+    window.addEventListener(
+      "resize",
+      function () {
+        clearTimeout(
+          resizeTimeout
+        );
+
+        resizeTimeout =
+          setTimeout(
+            renderAllBadges,
+            250
+          );
+      }
+    );
+
   })();
 </script>
 

@@ -1,80 +1,237 @@
 import { json } from "@remix-run/node";
 import db from "../db.server.js";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=120",
-};
-
-export const options = async () => new Response(null, { status: 204, headers: corsHeaders });
-
-export const loader = async ({ request }) => {
-  const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
-
-  if (!shop) {
-    return json({ error: "Missing Storefront Domain" }, { status: 400, headers: corsHeaders });
-  }
-
+export async function loader({ request }) {
   try {
-    const settings = await db.appSettings.findUnique({ where: { shop } });
+    const url = new URL(request.url);
+
+    const shop = url.searchParams.get("shop");
+
+    if (!shop) {
+      return json(
+        {
+          success: false,
+          error: "Shop is required",
+        },
+        { status: 400 }
+      );
+    }
+
     const badges = await db.badge.findMany({
-      where: { shop, enabled: true },
-      include: { products: true },
-      orderBy: { priority: "desc" },
+      where: {
+        shop,
+        enabled: true,
+      },
+      include: {
+        products: true,
+      },
+      orderBy: [
+        {
+          priority: "desc",
+        },
+        {
+          createdAt: "desc",
+        },
+      ],
     });
 
-    const parsed = badges.map((b) => ({
-      id: b.id,
-      text: b.text,
-      bgColor: b.bgColor,
-      textColor: b.textColor,
-      borderColor: b.borderColor,
-      position: b.position,
-      shape: b.shape,
-      icon: b.icon,
-      fontSize: b.fontSize,
-      paddingX: b.paddingX,
-      paddingY: b.paddingY,
-      borderRadius: b.borderRadius,
-      priority: b.priority,
-      targetType: b.targetType,
-      targetTags: b.targetTags ? b.targetTags.split(",").map((t) => t.trim().toLowerCase()) : [],
-      minInventory: b.minInventory,
-      maxInventory: b.maxInventory,
-      minPrice: b.minPrice,
-      maxPrice: b.maxPrice,
-      customCss: b.customCss,
-      hideOnMobile: b.hideOnMobile ?? false,
-      hideOnDesktop: b.hideOnDesktop ?? false,
-      productIds: b.products.map((p) => p.productId.replace(/\D/g, "")),
+    const formattedBadges = badges.map((badge) => ({
+      id: badge.id,
+
+      enabled: badge.enabled,
+
+      text: badge.text,
+      icon: badge.icon,
+
+      bgColor: badge.bgColor,
+      textColor: badge.textColor,
+      borderColor: badge.borderColor,
+
+      shape: badge.shape,
+      position: badge.position,
+
+      fontSize: badge.fontSize,
+      fontWeight: badge.fontWeight,
+
+      paddingX: badge.paddingX,
+      paddingY: badge.paddingY,
+      borderRadius: badge.borderRadius,
+
+      customCss: badge.customCss,
+
+      hideOnMobile: badge.hideOnMobile,
+      hideOnDesktop: badge.hideOnDesktop,
+
+      targetType: badge.targetType,
+
+      targetTags: badge.targetTags
+        ? badge.targetTags
+            .split(",")
+            .map((tag) => tag.trim().toLowerCase())
+            .filter(Boolean)
+        : [],
+
+      targetCollection: badge.targetCollection,
+
+      minInventory: badge.minInventory,
+      maxInventory: badge.maxInventory,
+
+      minPrice: badge.minPrice,
+      maxPrice: badge.maxPrice,
+
+      startDate: badge.startDate,
+      endDate: badge.endDate,
+
+      priority: badge.priority,
+
+      productIds: badge.products.map(
+        (product) => product.productId
+      ),
     }));
 
-    return json({ badges: parsed, globalCustomCss: settings?.globalCustomCss || "" }, { headers: corsHeaders });
-  } catch (err) {
-    return json({ error: err.message }, { status: 500, headers: corsHeaders });
-  }
-};
+    return json({
+      success: true,
+      badges: formattedBadges,
+    });
+  } catch (error) {
+    console.error("BADGES API ERROR:", error);
 
-export const action = async ({ request }) => {
+    return json(
+      {
+        success: false,
+        error: "Failed to load badges",
+        badges: [],
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function action({ request }) {
   try {
     const body = await request.json();
-    const { badgeId, eventType } = body;
 
-    if (!badgeId || !eventType) {
-      return json({ error: "Invalid Event Signature" }, { status: 400, headers: corsHeaders });
+    const badgeId = String(body.badgeId || "");
+    const eventType = String(body.eventType || "").toUpperCase();
+
+    if (!badgeId) {
+      return json(
+        {
+          success: false,
+          error: "Badge ID is required",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      !["IMPRESSION", "CLICK", "CONVERSION"].includes(
+        eventType
+      )
+    ) {
+      return json(
+        {
+          success: false,
+          error: "Invalid event type",
+        },
+        { status: 400 }
+      );
+    }
+
+    const badge = await db.badge.findUnique({
+      where: {
+        id: badgeId,
+      },
+    });
+
+    if (!badge) {
+      return json(
+        {
+          success: false,
+          error: "Badge not found",
+        },
+        { status: 404 }
+      );
     }
 
     if (eventType === "IMPRESSION") {
-      await db.badge.update({ where: { id: badgeId }, data: { impressions: { increment: 1 } } });
-    } else if (eventType === "CLICK") {
-      await db.badge.update({ where: { id: badgeId }, data: { clicks: { increment: 1 } } });
+      await db.$transaction([
+        db.badge.update({
+          where: {
+            id: badgeId,
+          },
+          data: {
+            impressions: {
+              increment: 1,
+            },
+          },
+        }),
+
+        db.analyticsLog.create({
+          data: {
+            badgeId,
+            eventType: "IMPRESSION",
+          },
+        }),
+      ]);
     }
 
-    return json({ success: true }, { headers: corsHeaders });
-  } catch (err) {
-    return json({ error: err.message }, { status: 500, headers: corsHeaders });
+    if (eventType === "CLICK") {
+      await db.$transaction([
+        db.badge.update({
+          where: {
+            id: badgeId,
+          },
+          data: {
+            clicks: {
+              increment: 1,
+            },
+          },
+        }),
+
+        db.analyticsLog.create({
+          data: {
+            badgeId,
+            eventType: "CLICK",
+          },
+        }),
+      ]);
+    }
+
+    if (eventType === "CONVERSION") {
+      await db.$transaction([
+        db.badge.update({
+          where: {
+            id: badgeId,
+          },
+          data: {
+            conversions: {
+              increment: 1,
+            },
+          },
+        }),
+
+        db.analyticsLog.create({
+          data: {
+            badgeId,
+            eventType: "CONVERSION",
+          },
+        }),
+      ]);
+    }
+
+    return json({
+      success: true,
+    });
+  } catch (error) {
+    console.error("BADGES EVENT ERROR:", error);
+
+    return json(
+      {
+        success: false,
+        error: "Failed to record event",
+      },
+      { status: 500 }
+    );
   }
-};
+}
