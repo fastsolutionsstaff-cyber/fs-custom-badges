@@ -6,7 +6,6 @@
     const SHOP_DOMAIN = "{{ shop.permanent_domain }}";
 
     let badgeConfiguration = [];
-    let engineInitialized = false;
 
     async function loadBadges() {
       try {
@@ -21,23 +20,24 @@
         );
 
         if (!response.ok) {
-          console.warn("[FS Custom Badges] Badges load error:", response.status);
+          console.warn("[FS Badges] API Error Status:", response.status);
           return false;
         }
 
         const data = await response.json();
-        
-        // Sort Badges: SPECIFIC_PRODUCTS build high priority over GLOBAL
+        console.log("[FS Badges] RAW API Data:", data);
+
         const rawBadges = Array.isArray(data.badges) ? data.badges : [];
+        
+        // Priority Sorting: Specific Badges FIRST, Global LAST
         badgeConfiguration = rawBadges.sort((a, b) => {
-          const typeA = a.targetType || (a.isGlobal ? "GLOBAL" : "GLOBAL");
-          const typeB = b.targetType || (b.isGlobal ? "GLOBAL" : "GLOBAL");
+          const typeA = String(a.targetType || (a.isGlobal ? "GLOBAL" : "GLOBAL")).toUpperCase();
+          const typeB = String(b.targetType || (b.isGlobal ? "GLOBAL" : "GLOBAL")).toUpperCase();
+          
           if (typeA === "SPECIFIC_PRODUCTS" && typeB !== "SPECIFIC_PRODUCTS") return -1;
           if (typeA !== "SPECIFIC_PRODUCTS" && typeB === "SPECIFIC_PRODUCTS") return 1;
           return 0;
         });
-
-        console.log("[FS Custom Badges] Sorted Badge Configuration:", badgeConfiguration);
 
         if (
           data.globalCustomCss &&
@@ -51,19 +51,20 @@
 
         return true;
       } catch (error) {
-        console.error("[FS Custom Badges] Proxy load error:", error);
+        console.error("[FS Badges] Network/Proxy Fail:", error);
         return false;
       }
     }
 
     function getProductCards() {
+      // Direct product media wrappers or link parents
       const selectors = [
         ".card-wrapper",
         ".card.product-card",
         ".product-card",
         "product-card",
         ".grid__item .card",
-        ".grid__item",
+        "li.grid__item",
         "[data-product-id]",
         ".product__media-wrapper",
         ".product-single__photos"
@@ -77,147 +78,85 @@
       return Array.from(cards);
     }
 
-    function normalizeProductId(value) {
-      if (!value) return null;
-      const stringValue = String(value);
-      const match = stringValue.match(/(\d+)(?!.*\d)/);
-      return match ? match[1] : null;
+    function cleanString(val) {
+      if (val === null || val === undefined) return "";
+      return String(val).trim().toLowerCase();
     }
 
-    function parseMoney(value) {
-      if (!value) return 0;
-      let cleaned = String(value).replace(/[^\d.,-]/g, "").trim();
-      if (!cleaned) return 0;
-
-      if (cleaned.includes(",") && cleaned.includes(".")) {
-        const lastComma = cleaned.lastIndexOf(",");
-        const lastDot = cleaned.lastIndexOf(".");
-        if (lastComma > lastDot) {
-          cleaned = cleaned.replace(/\./g, "").replace(",", ".");
-        } else {
-          cleaned = cleaned.replace(/,/g, "");
-        }
-      } else if (cleaned.includes(",")) {
-        const parts = cleaned.split(",");
-        if (parts.length === 2 && parts[1].length <= 2) {
-          cleaned = cleaned.replace(",", ".");
-        } else {
-          cleaned = cleaned.replace(/,/g, "");
-        }
-      }
-
-      const number = parseFloat(cleaned);
-      return Number.isNaN(number) ? 0 : number;
+    function extractNumericId(val) {
+      if (!val) return null;
+      const str = String(val);
+      const match = str.match(/(\d+)/g);
+      return match ? match.join("") : null;
     }
 
     function getProductData(card) {
       let productId = null;
       let productHandle = null;
 
+      // Check card attributes
       if (card.dataset.productId) {
-        productId = normalizeProductId(card.dataset.productId);
+        productId = extractNumericId(card.dataset.productId);
       }
 
-      const productLink = card.querySelector('a[href*="/products/"]');
-      if (productLink) {
-        const href = productLink.getAttribute("href") || "";
+      // Check nested links
+      const links = card.querySelectorAll('a[href*="/products/"]');
+      links.forEach((link) => {
+        const href = link.getAttribute("href") || "";
         const match = href.match(/\/products\/([^/?#]+)/i);
-        if (match) {
+        if (match && !productHandle) {
           productHandle = match[1];
-          const variantMatch = href.match(/[?&]variant=(\d+)/i);
-          if (variantMatch && !productId) {
-            productId = normalizeProductId(variantMatch[1]);
-          }
         }
-      }
+        const variantMatch = href.match(/[?&]variant=(\d+)/i);
+        if (variantMatch && !productId) {
+          productId = variantMatch[1];
+        }
+      });
 
+      // PDP Fallback
       if (!productHandle && window.location.pathname.includes("/products/")) {
         const pdpMatch = window.location.pathname.match(/\/products\/([^/?#]+)/i);
         if (pdpMatch) productHandle = pdpMatch[1];
       }
 
+      // Check child nodes for dataset ID
       if (!productId) {
-        const possibleIdElements = ["[data-product-id]", "[data-product]", "[data-product-handle]", "[id*='CardArticle-']"];
-        for (const selector of possibleIdElements) {
-          const element = card.querySelector(selector);
-          if (!element) continue;
-          const possibleId = element.dataset.productId || element.dataset.product || element.id;
-          if (possibleId) {
-            productId = normalizeProductId(possibleId);
-            if (productId) break;
-          }
+        const idElem = card.querySelector("[data-product-id], [data-id], [id*='CardArticle-']");
+        if (idElem) {
+          const val = idElem.dataset.productId || idElem.dataset.id || idElem.id;
+          productId = extractNumericId(val);
         }
       }
 
-      let price = 0;
-      const priceElement = card.querySelector(".price-item--regular, .price__regular .price-item, .price-item");
-      if (priceElement) {
-        price = parseMoney(priceElement.textContent);
-      }
-      if (card.dataset.price) {
-        const parsedPrice = parseFloat(card.dataset.price);
-        if (!Number.isNaN(parsedPrice)) price = parsedPrice;
-      }
-
-      let tags = [];
-      if (card.dataset.tags) {
-        tags = card.dataset.tags.split(",").map((tag) => tag.trim().toLowerCase()).filter(Boolean);
-      }
-
-      let inventory = 999999;
-      if (card.dataset.inventory) {
-        const parsedInventory = parseInt(card.dataset.inventory, 10);
-        if (!Number.isNaN(parsedInventory)) inventory = parsedInventory;
-      }
-
-      return { productId, productHandle, tags, price, inventory };
-    }
-
-    function isDeviceEligible(badge) {
-      const isMobile = window.matchMedia("(max-width: 749px)").matches;
-      if (isMobile && badge.hideOnMobile === true) return false;
-      if (!isMobile && badge.hideOnDesktop === true) return false;
-      return true;
+      return { 
+        productId: productId ? String(productId) : null, 
+        productHandle: productHandle ? cleanString(productHandle) : null 
+      };
     }
 
     function isEligible(badge, productData) {
+      // 1. Status Check
       if (badge.enabled === false || badge.isActive === false || badge.status === "INACTIVE") {
         return false;
       }
 
-      if (!isDeviceEligible(badge)) return false;
+      // 2. Target Check
+      const targetType = String(badge.targetType || (badge.isGlobal ? "GLOBAL" : "GLOBAL")).toUpperCase();
 
-      const targetType = badge.targetType || (badge.isGlobal ? "GLOBAL" : "GLOBAL");
+      // GLOBAL matches EVERYTHING
+      if (targetType === "GLOBAL" || badge.isGlobal === true) {
+        return true;
+      }
 
-      if (targetType === "GLOBAL") return true;
-
+      // SPECIFIC PRODUCTS
       if (targetType === "SPECIFIC_PRODUCTS") {
-        const badgeProductIds = Array.isArray(badge.productIds) ? badge.productIds.map(id => normalizeProductId(id)) : [];
-        const badgeHandles = Array.isArray(badge.productHandles) ? badge.productHandles.map(h => String(h).toLowerCase()) : [];
+        const targetIds = Array.isArray(badge.productIds) ? badge.productIds.map(id => extractNumericId(id)) : [];
+        const targetHandles = Array.isArray(badge.productHandles) ? badge.productHandles.map(h => cleanString(h)) : [];
 
-        const matchesId = productData.productId && badgeProductIds.includes(productData.productId);
-        const matchesHandle = productData.productHandle && badgeHandles.includes(String(productData.productHandle).toLowerCase());
+        const idMatched = productData.productId && targetIds.includes(productData.productId);
+        const handleMatched = productData.productHandle && targetHandles.includes(productData.productHandle);
 
-        return matchesId || matchesHandle;
-      }
-
-      if (targetType === "PRODUCT_TAGS") {
-        if (!Array.isArray(badge.targetTags) || badge.targetTags.length === 0) return false;
-        return productData.tags.some((tag) =>
-          badge.targetTags.map(t => String(t).trim().toLowerCase()).includes(String(tag).trim().toLowerCase())
-        );
-      }
-
-      if (targetType === "INVENTORY_LEVEL") {
-        const min = Number(badge.minInventory ?? 0);
-        const max = Number(badge.maxInventory ?? 999999);
-        return productData.inventory >= min && productData.inventory <= max;
-      }
-
-      if (targetType === "PRICE_RANGE") {
-        const min = Number(badge.minPrice ?? 0);
-        const max = Number(badge.maxPrice ?? 999999999);
-        return productData.price >= min && productData.price <= max;
+        return Boolean(idMatched || handleMatched);
       }
 
       return false;
@@ -232,10 +171,6 @@
         card.querySelector(".product__media-list") ||
         card
       );
-    }
-
-    function removeExistingBadges(card) {
-      card.querySelectorAll(".fs-custom-storefront-badge").forEach((badge) => badge.remove());
     }
 
     function renderBadge(card, badge, productData) {
@@ -267,144 +202,82 @@
         case "CENTER_OVERLAY":
           positionStyle = "top: 50%; left: 50%; transform: translate(-50%, -50%);";
           break;
-        default:
-          break;
       }
-
-      const shape = String(badge.shape || "PILL").toUpperCase();
-      let radius = `${badge.borderRadius || 8}px`;
-      if (shape === "PILL") radius = "999px";
-      if (shape === "SHARP") radius = "0px";
-
-      const isOutline = shape === "OUTLINE";
-      const isGlass = shape === "GLASSMORPHISM";
 
       const bgColor = badge.bgColor || "#111827";
       const textColor = badge.textColor || "#FFFFFF";
-      const borderColor = badge.borderColor || bgColor;
 
       badgeElement.style.cssText = `
-        position: absolute;
+        position: absolute !important;
         ${positionStyle}
         display: inline-flex !important;
-        align-items: center;
-        justify-content: center;
+        align-items: center !important;
+        justify-content: center !important;
         gap: 5px;
         padding: ${badge.paddingY || 6}px ${badge.paddingX || 12}px;
-        min-height: 20px;
-        background: ${isOutline ? "transparent" : isGlass ? `${bgColor}CC` : bgColor};
-        color: ${isOutline ? bgColor : textColor};
-        border: ${isOutline ? `1.5px solid ${bgColor}` : `1px solid ${borderColor}`};
-        border-radius: ${radius};
+        background-color: ${bgColor} !important;
+        color: ${textColor} !important;
+        border-radius: ${badge.borderRadius || 8}px;
         font-size: ${badge.fontSize || 12}px;
-        font-weight: ${badge.fontWeight || "700"};
-        line-height: 1.2;
-        letter-spacing: 0.2px;
-        text-transform: uppercase;
-        white-space: nowrap;
-        z-index: 99;
-        box-sizing: border-box;
+        font-weight: bold;
+        z-index: 9999 !important;
         pointer-events: auto;
-        cursor: pointer;
-        box-shadow: 0 3px 10px rgba(0,0,0,0.15);
-        ${isGlass ? "backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);" : ""}
-        ${badge.customCss ? badge.customCss : ""}
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
       `;
 
       if (badge.icon) {
         const icon = document.createElement("span");
-        icon.className = "fs-custom-badge-icon";
         icon.textContent = badge.icon;
-        icon.style.cssText = `display: inline-flex; align-items: center; line-height: 1;`;
         badgeElement.appendChild(icon);
       }
 
       const text = document.createElement("span");
-      text.className = "fs-custom-badge-text";
       text.textContent = badge.text || "BADGE";
       badgeElement.appendChild(text);
 
-      badgeElement.addEventListener("click", function () {
-        trackEvent(badge.id, "CLICK", productData.productId);
-      });
-
       mediaElement.appendChild(badgeElement);
-      console.log(`[FS Custom Badges] Badged rendered for Product (${productData.productId || productData.productHandle}):`, badge.text);
-      trackEvent(badge.id, "IMPRESSION", productData.productId);
-    }
-
-    function trackEvent(badgeId, eventType, productId) {
-      try {
-        fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          keepalive: true,
-          body: JSON.stringify({ badgeId, eventType, productId })
-        }).catch(() => {});
-      } catch (error) {}
+      console.log(`[FS Badges] SUCCESS: Rendered "${badge.text}" on product handle/ID:`, productData.productHandle || productData.productId);
     }
 
     function renderAllBadges() {
-      if (!badgeConfiguration || badgeConfiguration.length === 0) return;
+      if (!badgeConfiguration.length) return;
       const cards = getProductCards();
-      if (!cards.length) return;
 
       cards.forEach((card) => {
         const productData = getProductData(card);
 
-        removeExistingBadges(card);
+        // Remove old badges on re-render
+        card.querySelectorAll(".fs-custom-storefront-badge").forEach((b) => b.remove());
 
-        const matchingBadge = badgeConfiguration.find((badge) =>
-          isEligible(badge, productData)
-        );
+        const matchedBadge = badgeConfiguration.find((badge) => isEligible(badge, productData));
 
-        if (matchingBadge) {
-          renderBadge(card, matchingBadge, productData);
+        if (matchedBadge) {
+          renderBadge(card, matchedBadge, productData);
         }
       });
     }
 
-    async function initialize() {
-      if (engineInitialized) {
+    async function init() {
+      const success = await loadBadges();
+      if (success) {
         renderAllBadges();
-        return;
       }
-      engineInitialized = true;
-      const loaded = await loadBadges();
-      if (!loaded) return;
-      renderAllBadges();
-    }
-
-    document.addEventListener("shopify:section:load", () => setTimeout(renderAllBadges, 150));
-    document.addEventListener("shopify:section:reorder", () => setTimeout(renderAllBadges, 150));
-    document.addEventListener("shopify:section:select", () => setTimeout(renderAllBadges, 150));
-
-    let renderTimeout = null;
-    const observer = new MutationObserver(function () {
-      clearTimeout(renderTimeout);
-      renderTimeout = setTimeout(renderAllBadges, 250);
-    });
-
-    function startObserver() {
-      if (!document.body) return;
-      observer.observe(document.body, { childList: true, subtree: true });
     }
 
     if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", function () {
-        initialize();
-        startObserver();
-      });
+      document.addEventListener("DOMContentLoaded", init);
     } else {
-      initialize();
-      startObserver();
+      init();
     }
 
-    let resizeTimeout;
-    window.addEventListener("resize", function () {
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(renderAllBadges, 250);
+    // Shopify Live Theme / Observer Handling
+    const observer = new MutationObserver(() => {
+      renderAllBadges();
     });
+
+    if (document.body) {
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
   })();
 </script>
 
