@@ -2,7 +2,6 @@
   (function () {
     "use strict";
 
-    // App Proxy Endpoint
     const API_ENDPOINT = "/apps/badges";
     const SHOP_DOMAIN = "{{ shop.permanent_domain }}";
 
@@ -15,23 +14,30 @@
           `${API_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`,
           {
             method: "GET",
-            headers: {
-              "Accept": "application/json"
-            },
+            headers: { "Accept": "application/json" },
             credentials: "same-origin",
             cache: "no-store"
           }
         );
 
         if (!response.ok) {
-          console.warn("[FS Custom Badges] Badges load nahi ho sakay. Status:", response.status);
+          console.warn("[FS Custom Badges] Badges load error:", response.status);
           return false;
         }
 
         const data = await response.json();
-        console.log("[FS Custom Badges] API Response received:", data);
+        
+        // Sort Badges: SPECIFIC_PRODUCTS build high priority over GLOBAL
+        const rawBadges = Array.isArray(data.badges) ? data.badges : [];
+        badgeConfiguration = rawBadges.sort((a, b) => {
+          const typeA = a.targetType || (a.isGlobal ? "GLOBAL" : "GLOBAL");
+          const typeB = b.targetType || (b.isGlobal ? "GLOBAL" : "GLOBAL");
+          if (typeA === "SPECIFIC_PRODUCTS" && typeB !== "SPECIFIC_PRODUCTS") return -1;
+          if (typeA !== "SPECIFIC_PRODUCTS" && typeB === "SPECIFIC_PRODUCTS") return 1;
+          return 0;
+        });
 
-        badgeConfiguration = Array.isArray(data.badges) ? data.badges : [];
+        console.log("[FS Custom Badges] Sorted Badge Configuration:", badgeConfiguration);
 
         if (
           data.globalCustomCss &&
@@ -59,8 +65,8 @@
         ".grid__item .card",
         ".grid__item",
         "[data-product-id]",
-        ".product__media-wrapper", // PDP Specific Support
-        ".product-single__photos"   // PDP Support
+        ".product__media-wrapper",
+        ".product-single__photos"
       ];
 
       const cards = new Set();
@@ -108,12 +114,10 @@
       let productId = null;
       let productHandle = null;
 
-      // 1. Check card dataset
       if (card.dataset.productId) {
         productId = normalizeProductId(card.dataset.productId);
       }
 
-      // 2. Extract from links (Collection Cards)
       const productLink = card.querySelector('a[href*="/products/"]');
       if (productLink) {
         const href = productLink.getAttribute("href") || "";
@@ -127,13 +131,11 @@
         }
       }
 
-      // 3. Fallback for Product Details Page (PDP)
       if (!productHandle && window.location.pathname.includes("/products/")) {
         const pdpMatch = window.location.pathname.match(/\/products\/([^/?#]+)/i);
         if (pdpMatch) productHandle = pdpMatch[1];
       }
 
-      // 4. Try extract numeric IDs inside card attributes
       if (!productId) {
         const possibleIdElements = ["[data-product-id]", "[data-product]", "[data-product-handle]", "[id*='CardArticle-']"];
         for (const selector of possibleIdElements) {
@@ -179,7 +181,6 @@
     }
 
     function isEligible(badge, productData) {
-      // Allow if active
       if (badge.enabled === false || badge.isActive === false || badge.status === "INACTIVE") {
         return false;
       }
@@ -188,20 +189,14 @@
 
       const targetType = badge.targetType || (badge.isGlobal ? "GLOBAL" : "GLOBAL");
 
-      // Global Badge
       if (targetType === "GLOBAL") return true;
 
-      // Specific Products Match
       if (targetType === "SPECIFIC_PRODUCTS") {
-        if (!Array.isArray(badge.productIds) && !Array.isArray(badge.productHandles)) return false;
-        
-        // Match by ID
-        const matchesId = productData.productId && Array.isArray(badge.productIds) && 
-          badge.productIds.some((id) => normalizeProductId(id) === productData.productId);
+        const badgeProductIds = Array.isArray(badge.productIds) ? badge.productIds.map(id => normalizeProductId(id)) : [];
+        const badgeHandles = Array.isArray(badge.productHandles) ? badge.productHandles.map(h => String(h).toLowerCase()) : [];
 
-        // Match by Handle
-        const matchesHandle = productData.productHandle && Array.isArray(badge.productHandles) &&
-          badge.productHandles.some((h) => String(h).toLowerCase() === String(productData.productHandle).toLowerCase());
+        const matchesId = productData.productId && badgeProductIds.includes(productData.productId);
+        const matchesHandle = productData.productHandle && badgeHandles.includes(String(productData.productHandle).toLowerCase());
 
         return matchesId || matchesHandle;
       }
@@ -291,7 +286,7 @@
       badgeElement.style.cssText = `
         position: absolute;
         ${positionStyle}
-        display: inline-flex;
+        display: inline-flex !important;
         align-items: center;
         justify-content: center;
         gap: 5px;
@@ -307,7 +302,7 @@
         letter-spacing: 0.2px;
         text-transform: uppercase;
         white-space: nowrap;
-        z-index: 20;
+        z-index: 99;
         box-sizing: border-box;
         pointer-events: auto;
         cursor: pointer;
@@ -334,6 +329,7 @@
       });
 
       mediaElement.appendChild(badgeElement);
+      console.log(`[FS Custom Badges] Badged rendered for Product (${productData.productId || productData.productHandle}):`, badge.text);
       trackEvent(badge.id, "IMPRESSION", productData.productId);
     }
 
