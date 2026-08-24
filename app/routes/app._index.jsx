@@ -215,7 +215,7 @@ export const loader = async ({ request }) => {
 
   const formattedBadges = badges.map((badge) => ({
     ...badge,
-    productIds: badge.products.map((product) => product.productId),
+    productIds: badge.products ? badge.products.map((product) => product.productId) : [],
   }));
 
   const totalImpressions = formattedBadges.reduce(
@@ -321,38 +321,38 @@ export const action = async ({ request }) => {
           shop,
           name: `${existing.name} Copy`,
           enabled: false,
-          priority: existing.priority,
+          priority: existing.priority || 0,
 
-          text: existing.text,
-          bgColor: existing.bgColor,
-          textColor: existing.textColor,
-          borderColor: existing.borderColor,
+          text: existing.text || "",
+          bgColor: existing.bgColor || "#111827",
+          textColor: existing.textColor || "#FFFFFF",
+          borderColor: existing.borderColor || "#000000",
 
-          position: existing.position,
-          shape: existing.shape,
-          icon: existing.icon,
+          position: existing.position || "TOP_LEFT",
+          shape: existing.shape || "PILL",
+          icon: existing.icon || "",
 
-          fontSize: existing.fontSize,
-          fontWeight: existing.fontWeight,
+          fontSize: existing.fontSize || 12,
+          fontWeight: existing.fontWeight || "bold",
 
-          paddingY: existing.paddingY,
-          paddingX: existing.paddingX,
-          borderRadius: existing.borderRadius,
+          paddingY: existing.paddingY || 4,
+          paddingX: existing.paddingX || 10,
+          borderRadius: existing.borderRadius || 20,
 
-          customCss: existing.customCss,
+          customCss: existing.customCss || "",
 
-          hideOnMobile: existing.hideOnMobile,
-          hideOnDesktop: existing.hideOnDesktop,
+          hideOnMobile: Boolean(existing.hideOnMobile),
+          hideOnDesktop: Boolean(existing.hideOnDesktop),
 
-          targetType: existing.targetType,
-          targetTags: existing.targetTags,
-          targetCollection: existing.targetCollection,
+          targetType: existing.targetType || "GLOBAL",
+          targetTags: existing.targetTags || "",
+          targetCollection: existing.targetCollection || "",
 
-          minInventory: existing.minInventory,
-          maxInventory: existing.maxInventory,
+          minInventory: existing.minInventory || 0,
+          maxInventory: existing.maxInventory || 9999,
 
-          minPrice: existing.minPrice,
-          maxPrice: existing.maxPrice,
+          minPrice: existing.minPrice || 0,
+          maxPrice: existing.maxPrice || 99999,
 
           startDate: existing.startDate,
           endDate: existing.endDate,
@@ -408,19 +408,19 @@ export const action = async ({ request }) => {
   const position = String(formData.get("position") || "TOP_LEFT");
   const shape = String(formData.get("shape") || "PILL");
 
-  const fontSize = parseInt(formData.get("fontSize") || "12", 10);
+  const fontSize = parseInt(formData.get("fontSize") || "12", 10) || 12;
   const fontWeight = String(formData.get("fontWeight") || "bold");
-  const paddingX = parseInt(formData.get("paddingX") || "10", 10);
-  const paddingY = parseInt(formData.get("paddingY") || "4", 10);
-  const borderRadius = parseInt(formData.get("borderRadius") || "20", 10);
-  const priority = parseInt(formData.get("priority") || "0", 10);
+  const paddingX = parseInt(formData.get("paddingX") || "10", 10) || 10;
+  const paddingY = parseInt(formData.get("paddingY") || "4", 10) || 4;
+  const borderRadius = parseInt(formData.get("borderRadius") || "20", 10) || 20;
+  const priority = parseInt(formData.get("priority") || "0", 10) || 0;
 
   const targetType = String(formData.get("targetType") || "GLOBAL");
   const targetTags = String(formData.get("targetTags") || "");
-  const minInventory = parseInt(formData.get("minInventory") || "0", 10);
-  const maxInventory = parseInt(formData.get("maxInventory") || "9999", 10);
-  const minPrice = parseFloat(formData.get("minPrice") || "0");
-  const maxPrice = parseFloat(formData.get("maxPrice") || "99999");
+  const minInventory = parseInt(formData.get("minInventory") || "0", 10) || 0;
+  const maxInventory = parseInt(formData.get("maxInventory") || "9999", 10) || 9999;
+  const minPrice = parseFloat(formData.get("minPrice") || "0") || 0;
+  const maxPrice = parseFloat(formData.get("maxPrice") || "99999") || 99999;
 
   const customCss = String(formData.get("customCss") || "");
   const hideOnMobile = formData.get("hideOnMobile") === "true";
@@ -522,7 +522,7 @@ export const action = async ({ request }) => {
 ========================================================= */
 
 export default function SaaSAdminApp() {
-  const { settings, badges, analytics } = useLoaderData();
+  const { settings, badges = [], analytics = {} } = useLoaderData();
   const actionData = useActionData();
   const submit = useSubmit();
   const navigation = useNavigation();
@@ -707,28 +707,28 @@ export default function SaaSAdminApp() {
       formData.shape === "OUTLINE"
         ? "transparent"
         : formData.shape === "GLASSMORPHISM"
-        ? `${formData.bgColor}CC`
-        : formData.bgColor,
+        ? `${formData.bgColor || "#DC2626"}CC`
+        : formData.bgColor || "#DC2626",
 
     color:
       formData.shape === "OUTLINE"
-        ? formData.bgColor
-        : formData.textColor,
+        ? formData.bgColor || "#DC2626"
+        : formData.textColor || "#FFFFFF",
 
-    border: `1px solid ${formData.borderColor || formData.bgColor}`,
+    border: `1px solid ${formData.borderColor || formData.bgColor || "#991B1B"}`,
 
     borderRadius:
       formData.shape === "PILL"
         ? "999px"
         : formData.shape === "SHARP"
         ? "0px"
-        : `${formData.borderRadius}px`,
+        : `${formData.borderRadius || 20}px`,
 
-    padding: `${formData.paddingY}px ${formData.paddingX}px`,
+    padding: `${formData.paddingY || 4}px ${formData.paddingX || 10}px`,
 
-    fontSize: `${formData.fontSize}px`,
+    fontSize: `${formData.fontSize || 12}px`,
 
-    fontWeight: formData.fontWeight,
+    fontWeight: formData.fontWeight || "bold",
 
     backdropFilter:
       formData.shape === "GLASSMORPHISM" ? "blur(10px)" : "none",
@@ -745,6 +745,8 @@ export default function SaaSAdminApp() {
     textTransform: "uppercase",
     letterSpacing: "0.2px",
   };
+
+  const safePosition = formData.position || "TOP_LEFT";
 
   /* =====================================================
      UI
@@ -807,7 +809,7 @@ export default function SaaSAdminApp() {
                   Badge impressions
                 </Text>
                 <Text variant="headingXl">
-                  {analytics.totalImpressions.toLocaleString()}
+                  {Number(analytics.totalImpressions || 0).toLocaleString()}
                 </Text>
                 <PolarisBadge tone="info">Storefront analytics</PolarisBadge>
               </BlockStack>
@@ -820,9 +822,9 @@ export default function SaaSAdminApp() {
                 <Text variant="bodySm" tone="subdued">
                   Average CTR
                 </Text>
-                <Text variant="headingXl">{analytics.avgCtr}%</Text>
+                <Text variant="headingXl">{analytics.avgCtr || "0.00"}%</Text>
                 <PolarisBadge tone="attention">
-                  {analytics.totalClicks.toLocaleString()} clicks
+                  {Number(analytics.totalClicks || 0).toLocaleString()} clicks
                 </PolarisBadge>
               </BlockStack>
             </Card>
@@ -956,7 +958,7 @@ export default function SaaSAdminApp() {
                                 {badge.targetType === "GLOBAL"
                                   ? "All products"
                                   : badge.targetType === "SPECIFIC_PRODUCTS"
-                                  ? `${badge.productIds.length} selected products`
+                                  ? `${(badge.productIds || []).length} selected products`
                                   : badge.targetType === "PRODUCT_TAGS"
                                   ? "Product tags"
                                   : badge.targetType === "INVENTORY_LEVEL"
@@ -989,7 +991,7 @@ export default function SaaSAdminApp() {
                             <PolarisBadge tone="info">
                               {badge.targetType === "GLOBAL"
                                 ? "Storewide"
-                                : badge.targetType
+                                : String(badge.targetType || "")
                                     .replaceAll("_", " ")
                                     .toLowerCase()}
                             </PolarisBadge>
@@ -1064,7 +1066,7 @@ export default function SaaSAdminApp() {
                       <BlockStack gap="200">
                         <Text variant="bodySm" tone="subdued">Impressions</Text>
                         <Text variant="headingLg">
-                          {analytics.totalImpressions.toLocaleString()}
+                          {Number(analytics.totalImpressions || 0).toLocaleString()}
                         </Text>
                       </BlockStack>
                     </Card>
@@ -1075,7 +1077,7 @@ export default function SaaSAdminApp() {
                       <BlockStack gap="200">
                         <Text variant="bodySm" tone="subdued">Clicks</Text>
                         <Text variant="headingLg">
-                          {analytics.totalClicks.toLocaleString()}
+                          {Number(analytics.totalClicks || 0).toLocaleString()}
                         </Text>
                       </BlockStack>
                     </Card>
@@ -1085,7 +1087,7 @@ export default function SaaSAdminApp() {
                     <Card padding="400">
                       <BlockStack gap="200">
                         <Text variant="bodySm" tone="subdued">CTR</Text>
-                        <Text variant="headingLg">{analytics.avgCtr}%</Text>
+                        <Text variant="headingLg">{analytics.avgCtr || "0.00"}%</Text>
                       </BlockStack>
                     </Card>
                   </Grid.Cell>
@@ -1095,7 +1097,7 @@ export default function SaaSAdminApp() {
                       <BlockStack gap="200">
                         <Text variant="bodySm" tone="subdued">Conversions</Text>
                         <Text variant="headingLg">
-                          {analytics.totalConversions.toLocaleString()}
+                          {Number(analytics.totalConversions || 0).toLocaleString()}
                         </Text>
                       </BlockStack>
                     </Card>
@@ -1446,7 +1448,7 @@ export default function SaaSAdminApp() {
                         <Card background="bg-surface-secondary" padding="300">
                           <InlineStack align="space-between" blockAlign="center">
                             <Text>
-                              {formData.productIds.length} products selected
+                              {(formData.productIds || []).length} products selected
                             </Text>
                             <Button onClick={handleResourcePicker}>
                               Choose products
@@ -1684,12 +1686,12 @@ export default function SaaSAdminApp() {
                             <div
                               style={{
                                 position: "absolute",
-                                ...(formData.position.includes("TOP")
+                                ...(safePosition.includes("TOP")
                                   ? { top: "10px" }
                                   : { bottom: "10px" }),
-                                ...(formData.position.includes("LEFT")
+                                ...(safePosition.includes("LEFT")
                                   ? { left: "10px" }
-                                  : formData.position.includes("RIGHT")
+                                  : safePosition.includes("RIGHT")
                                   ? { right: "10px" }
                                   : {
                                       left: "50%",

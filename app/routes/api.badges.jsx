@@ -1,99 +1,86 @@
 import { json } from "@remix-run/node";
-import db from "../db.server.js";
+import db from "../db.server"; // Adjust path according to your db connection file
 
-// Helper to clean GraphQL ID (e.g., "gid://shopify/Product/12345" -> "12345")
 function cleanProductId(id) {
   if (!id) return "";
   return String(id).replace("gid://shopify/Product/", "").trim();
 }
 
-/* =========================================================
-   OPTIONS / PREFLIGHT REQUEST (FOR CORS)
-========================================================= */
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
   const shop = url.searchParams.get("shop");
   const rawProductId = url.searchParams.get("productId");
-  const rawTags = url.searchParams.get("tags") || "";
-  const price = parseFloat(url.searchParams.get("price") || "0");
-  const inventory = parseInt(url.searchParams.get("inventory") || "0", 10);
 
-  // CORS Headers for Shopify Storefront
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
-    "Cache-Control": "public, max-age=60, s-maxage=300", // Edge caching for high traffic
+    "Cache-Control": "public, max-age=30, s-maxage=60",
   };
 
   if (!shop) {
-    return json({ success: false, error: "Shop parameter is missing" }, { status: 400, headers: corsHeaders });
+    return json({ success: false, error: "Shop parameter missing" }, { status: 400, headers: corsHeaders });
   }
 
-  const productId = cleanProductId(rawProductId);
-  const productTags = rawTags.split(",").map((t) => t.trim().toLowerCase());
   const now = new Date();
 
-  // Fetch all enabled badges for this shop
+  // Active / Enabled badges fetch kar rahe hain
   const badges = await db.badge.findMany({
     where: {
       shop,
       enabled: true,
-      OR: [
-        { startDate: null },
-        { startDate: { lte: now } }
-      ],
-      AND: [
-        { OR: [{ endDate: null }, { endDate: { gte: now } }] }
-      ]
+      OR: [{ startDate: null }, { startDate: { lte: now } }],
+      AND: [{ OR: [{ endDate: null }, { endDate: { gte: now } }] }],
     },
     include: {
       products: true,
     },
     orderBy: [
-      { priority: "desc" }, // Highest priority first
-      { createdAt: "desc" }
+      { priority: "desc" },
+      { createdAt: "desc" },
     ],
   });
 
-  // Filter badges matching target criteria
-  const matchingBadges = badges.filter((badge) => {
-    // 1. GLOBAL
-    if (badge.targetType === "GLOBAL") return true;
-
-    // 2. SPECIFIC PRODUCTS
-    if (badge.targetType === "SPECIFIC_PRODUCTS") {
-      if (!productId) return false;
-      return badge.products.some(
-        (p) => cleanProductId(p.productId) === productId
-      );
-    }
-
-    // 3. PRODUCT TAGS
-    if (badge.targetType === "PRODUCT_TAGS") {
-      if (!badge.targetTags) return false;
-      const targetTags = badge.targetTags
-        .split(",")
-        .map((t) => t.trim().toLowerCase());
-      
-      // Match if product has at least one matching tag
-      return targetTags.some((tag) => productTags.includes(tag));
-    }
-
-    // 4. INVENTORY LEVEL
-    if (badge.targetType === "INVENTORY_LEVEL") {
-      return inventory >= badge.minInventory && inventory <= badge.maxInventory;
-    }
-
-    // 5. PRICE RANGE
-    if (badge.targetType === "PRICE_RANGE") {
-      return price >= badge.minPrice && price <= badge.maxPrice;
-    }
-
-    return false;
+  const formattedBadges = badges.map((b) => {
+    const productIds = b.products ? b.products.map((p) => cleanProductId(p.productId)) : [];
+    
+    return {
+      id: b.id,
+      name: b.name,
+      enabled: b.enabled,
+      text: b.text,
+      icon: b.icon,
+      bgColor: b.bgColor,
+      textColor: b.textColor,
+      borderColor: b.borderColor,
+      position: b.position,
+      shape: b.shape,
+      fontSize: b.fontSize,
+      fontWeight: b.fontWeight,
+      paddingX: b.paddingX,
+      paddingY: b.paddingY,
+      borderRadius: b.borderRadius,
+      priority: b.priority,
+      targetType: b.targetType,
+      productIds: productIds,
+      isGlobal: b.targetType === "GLOBAL",
+      customCss: b.customCss || ""
+    };
   });
 
-  // Global CSS settings
+  // Agar specific single product PDP route par request aayi ho
+  let filteredBadges = formattedBadges;
+  if (rawProductId) {
+    const cleanId = cleanProductId(rawProductId);
+    filteredBadges = formattedBadges.filter((badge) => {
+      if (badge.targetType === "GLOBAL" || badge.isGlobal) return true;
+      if (badge.targetType === "SPECIFIC_PRODUCTS") {
+        return badge.productIds.includes(cleanId);
+      }
+      return true;
+    });
+  }
+
   const settings = await db.appSettings.findUnique({
     where: { shop },
     select: { globalCustomCss: true },
@@ -102,8 +89,8 @@ export const loader = async ({ request }) => {
   return json(
     {
       success: true,
-      badges: matchingBadges,
-      globalCss: settings?.globalCustomCss || "",
+      badges: filteredBadges,
+      globalCustomCss: settings?.globalCustomCss || "",
     },
     { headers: corsHeaders }
   );

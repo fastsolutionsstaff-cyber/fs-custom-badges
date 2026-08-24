@@ -2,15 +2,24 @@
   (function () {
     "use strict";
 
-    const API_ENDPOINT = "/apps/badges";
+    // Matching exact route API
+    const API_ENDPOINT = "/apps/proxy/api/badges"; // Agar App Proxy set ho, warna direct URL use karein
+    const FALLBACK_ENDPOINT = "/api/badges"; 
     const SHOP_DOMAIN = "{{ shop.permanent_domain }}";
 
     let badgeConfiguration = [];
 
+    function cleanNumericId(val) {
+      if (!val) return null;
+      const str = String(val);
+      const match = str.match(/(\d+)/g);
+      return match ? match.join("") : null;
+    }
+
     async function loadBadges() {
       try {
-        const response = await fetch(
-          `${API_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`,
+        let response = await fetch(
+          `${FALLBACK_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`,
           {
             method: "GET",
             headers: { "Accept": "application/json" },
@@ -20,44 +29,33 @@
         );
 
         if (!response.ok) {
-          console.warn("[FS Badges] API Error Status:", response.status);
-          return false;
+          response = await fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`);
         }
 
+        if (!response.ok) return false;
+
         const data = await response.json();
-        console.log("[FS Badges] RAW API Data:", data);
+        console.log("👉 [Badges App]: Loaded Config", data);
 
-        const rawBadges = Array.isArray(data.badges) ? data.badges : [];
-        
-        // Priority Sorting: Specific Badges FIRST, Global LAST
-        badgeConfiguration = rawBadges.sort((a, b) => {
-          const typeA = String(a.targetType || (a.isGlobal ? "GLOBAL" : "GLOBAL")).toUpperCase();
-          const typeB = String(b.targetType || (b.isGlobal ? "GLOBAL" : "GLOBAL")).toUpperCase();
-          
-          if (typeA === "SPECIFIC_PRODUCTS" && typeB !== "SPECIFIC_PRODUCTS") return -1;
-          if (typeA !== "SPECIFIC_PRODUCTS" && typeB === "SPECIFIC_PRODUCTS") return 1;
-          return 0;
-        });
+        if (!data.success || !Array.isArray(data.badges)) return false;
 
-        if (
-          data.globalCustomCss &&
-          !document.getElementById("fs-custom-badges-global-css")
-        ) {
+        badgeConfiguration = data.badges;
+
+        if (data.globalCustomCss && !document.getElementById("fs-badges-global-css")) {
           const style = document.createElement("style");
-          style.id = "fs-custom-badges-global-css";
+          style.id = "fs-badges-global-css";
           style.textContent = data.globalCustomCss;
           document.head.appendChild(style);
         }
 
         return true;
       } catch (error) {
-        console.error("[FS Badges] Network/Proxy Fail:", error);
+        console.error("[Badges App] Error loading badges:", error);
         return false;
       }
     }
 
     function getProductCards() {
-      // Direct product media wrappers or link parents
       const selectors = [
         ".card-wrapper",
         ".card.product-card",
@@ -66,201 +64,123 @@
         ".grid__item .card",
         "li.grid__item",
         "[data-product-id]",
-        ".product__media-wrapper",
-        ".product-single__photos"
+        ".product__media-wrapper"
       ];
 
       const cards = new Set();
       selectors.forEach((selector) => {
-        document.querySelectorAll(selector).forEach((element) => cards.add(element));
+        document.querySelectorAll(selector).forEach((el) => cards.add(el));
       });
 
       return Array.from(cards);
     }
 
-    function cleanString(val) {
-      if (val === null || val === undefined) return "";
-      return String(val).trim().toLowerCase();
-    }
-
-    function extractNumericId(val) {
-      if (!val) return null;
-      const str = String(val);
-      const match = str.match(/(\d+)/g);
-      return match ? match.join("") : null;
-    }
-
     function getProductData(card) {
       let productId = null;
-      let productHandle = null;
 
-      // Check card attributes
       if (card.dataset.productId) {
-        productId = extractNumericId(card.dataset.productId);
+        productId = cleanNumericId(card.dataset.productId);
       }
 
-      // Check nested links
-      const links = card.querySelectorAll('a[href*="/products/"]');
-      links.forEach((link) => {
-        const href = link.getAttribute("href") || "";
-        const match = href.match(/\/products\/([^/?#]+)/i);
-        if (match && !productHandle) {
-          productHandle = match[1];
-        }
-        const variantMatch = href.match(/[?&]variant=(\d+)/i);
-        if (variantMatch && !productId) {
-          productId = variantMatch[1];
-        }
-      });
-
-      // PDP Fallback
-      if (!productHandle && window.location.pathname.includes("/products/")) {
-        const pdpMatch = window.location.pathname.match(/\/products\/([^/?#]+)/i);
-        if (pdpMatch) productHandle = pdpMatch[1];
-      }
-
-      // Check child nodes for dataset ID
       if (!productId) {
         const idElem = card.querySelector("[data-product-id], [data-id], [id*='CardArticle-']");
         if (idElem) {
-          const val = idElem.dataset.productId || idElem.dataset.id || idElem.id;
-          productId = extractNumericId(val);
+          const raw = idElem.dataset.productId || idElem.dataset.id || idElem.id;
+          productId = cleanNumericId(raw);
         }
       }
 
-      return { 
-        productId: productId ? String(productId) : null, 
-        productHandle: productHandle ? cleanString(productHandle) : null 
-      };
+      return { productId };
     }
 
     function isEligible(badge, productData) {
-      // 1. Status Check
-      if (badge.enabled === false || badge.isActive === false || badge.status === "INACTIVE") {
-        return false;
-      }
+      if (!badge.enabled) return false;
 
-      // 2. Target Check
-      const targetType = String(badge.targetType || (badge.isGlobal ? "GLOBAL" : "GLOBAL")).toUpperCase();
-
-      // GLOBAL matches EVERYTHING
-      if (targetType === "GLOBAL" || badge.isGlobal === true) {
+      if (badge.targetType === "GLOBAL" || badge.isGlobal) {
         return true;
       }
 
-      // SPECIFIC PRODUCTS
-      if (targetType === "SPECIFIC_PRODUCTS") {
-        const targetIds = Array.isArray(badge.productIds) ? badge.productIds.map(id => extractNumericId(id)) : [];
-        const targetHandles = Array.isArray(badge.productHandles) ? badge.productHandles.map(h => cleanString(h)) : [];
-
-        const idMatched = productData.productId && targetIds.includes(productData.productId);
-        const handleMatched = productData.productHandle && targetHandles.includes(productData.productHandle);
-
-        return Boolean(idMatched || handleMatched);
+      if (badge.targetType === "SPECIFIC_PRODUCTS") {
+        if (!productData.productId) return false;
+        const targetIds = (badge.productIds || []).map((id) => cleanNumericId(id));
+        return targetIds.includes(productData.productId);
       }
 
       return false;
     }
 
-    function getMediaElement(card) {
-      return (
+    function renderBadge(card, badge) {
+      const targetMedia =
         card.querySelector(".card__media") ||
         card.querySelector(".media") ||
         card.querySelector(".product-card__image-wrapper") ||
         card.querySelector(".card__inner") ||
-        card.querySelector(".product__media-list") ||
-        card
-      );
-    }
+        card;
 
-    function renderBadge(card, badge, productData) {
-      const mediaElement = getMediaElement(card);
-      if (!mediaElement) return;
+      if (targetMedia.querySelector(`[data-badge-id="${badge.id}"]`)) return;
 
-      if (mediaElement.querySelector(`[data-fs-badge-id="${badge.id}"]`)) return;
-
-      const computedStyle = window.getComputedStyle(mediaElement);
-      if (computedStyle.position === "static") {
-        mediaElement.style.position = "relative";
+      if (window.getComputedStyle(targetMedia).position === "static") {
+        targetMedia.style.position = "relative";
       }
 
-      const badgeElement = document.createElement("div");
-      badgeElement.className = "fs-custom-storefront-badge";
-      badgeElement.dataset.fsBadgeId = badge.id;
+      const badgeEl = document.createElement("div");
+      badgeEl.className = "fs-custom-storefront-badge";
+      badgeEl.dataset.badgeId = badge.id;
 
-      let positionStyle = "top: 10px; left: 10px;";
-      switch (badge.position) {
-        case "TOP_RIGHT":
-          positionStyle = "top: 10px; right: 10px;";
-          break;
-        case "BOTTOM_LEFT":
-          positionStyle = "bottom: 10px; left: 10px;";
-          break;
-        case "BOTTOM_RIGHT":
-          positionStyle = "bottom: 10px; right: 10px;";
-          break;
-        case "CENTER_OVERLAY":
-          positionStyle = "top: 50%; left: 50%; transform: translate(-50%, -50%);";
-          break;
-      }
+      let posCSS = "top: 10px; left: 10px;";
+      if (badge.position === "TOP_RIGHT") posCSS = "top: 10px; right: 10px;";
+      else if (badge.position === "BOTTOM_LEFT") posCSS = "bottom: 10px; left: 10px;";
+      else if (badge.position === "BOTTOM_RIGHT") posCSS = "bottom: 10px; right: 10px;";
+      else if (badge.position === "CENTER_OVERLAY") posCSS = "top: 50%; left: 50%; transform: translate(-50%, -50%);";
 
-      const bgColor = badge.bgColor || "#111827";
-      const textColor = badge.textColor || "#FFFFFF";
-
-      badgeElement.style.cssText = `
+      badgeEl.style.cssText = `
         position: absolute !important;
-        ${positionStyle}
+        ${posCSS}
         display: inline-flex !important;
         align-items: center !important;
-        justify-content: center !important;
-        gap: 5px;
-        padding: ${badge.paddingY || 6}px ${badge.paddingX || 12}px;
-        background-color: ${bgColor} !important;
-        color: ${textColor} !important;
-        border-radius: ${badge.borderRadius || 8}px;
+        gap: 4px;
+        padding: ${badge.paddingY || 4}px ${badge.paddingX || 10}px;
+        background-color: ${badge.bgColor || "#111827"} !important;
+        color: ${badge.textColor || "#FFFFFF"} !important;
+        border: 1px solid ${badge.borderColor || badge.bgColor || "#000000"};
+        border-radius: ${badge.borderRadius || 20}px;
         font-size: ${badge.fontSize || 12}px;
-        font-weight: bold;
-        z-index: 9999 !important;
-        pointer-events: auto;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        font-weight: ${badge.fontWeight || "bold"};
+        z-index: 999 !important;
+        pointer-events: none;
       `;
 
       if (badge.icon) {
-        const icon = document.createElement("span");
-        icon.textContent = badge.icon;
-        badgeElement.appendChild(icon);
+        const iconSpan = document.createElement("span");
+        iconSpan.textContent = badge.icon;
+        badgeEl.appendChild(iconSpan);
       }
 
-      const text = document.createElement("span");
-      text.textContent = badge.text || "BADGE";
-      badgeElement.appendChild(text);
+      const textSpan = document.createElement("span");
+      textSpan.textContent = badge.text || "BADGE";
+      badgeEl.appendChild(textSpan);
 
-      mediaElement.appendChild(badgeElement);
-      console.log(`[FS Badges] SUCCESS: Rendered "${badge.text}" on product handle/ID:`, productData.productHandle || productData.productId);
+      targetMedia.appendChild(badgeEl);
     }
 
-    function renderAllBadges() {
+    function applyBadges() {
       if (!badgeConfiguration.length) return;
       const cards = getProductCards();
 
       cards.forEach((card) => {
         const productData = getProductData(card);
+        const match = badgeConfiguration.find((badge) => isEligible(badge, productData));
 
-        // Remove old badges on re-render
-        card.querySelectorAll(".fs-custom-storefront-badge").forEach((b) => b.remove());
-
-        const matchedBadge = badgeConfiguration.find((badge) => isEligible(badge, productData));
-
-        if (matchedBadge) {
-          renderBadge(card, matchedBadge, productData);
+        if (match) {
+          renderBadge(card, match);
         }
       });
     }
 
     async function init() {
-      const success = await loadBadges();
-      if (success) {
-        renderAllBadges();
+      const loaded = await loadBadges();
+      if (loaded) {
+        applyBadges();
       }
     }
 
@@ -270,11 +190,7 @@
       init();
     }
 
-    // Shopify Live Theme / Observer Handling
-    const observer = new MutationObserver(() => {
-      renderAllBadges();
-    });
-
+    const observer = new MutationObserver(() => applyBadges());
     if (document.body) {
       observer.observe(document.body, { childList: true, subtree: true });
     }
