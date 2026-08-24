@@ -80,38 +80,56 @@
     const API_ENDPOINT = '/apps/badges';
     const shop = "{{ shop.permanent_domain }}";
 
-    const productId = String(wrapper.dataset.productId || "").replace(/\D/g, "");
-    const tags = wrapper.dataset.productTags ? wrapper.dataset.productTags.split(',').map(t => t.trim()) : [];
+    function normalizeProductId(value) {
+      if (!value) return null;
+      const match = String(value).match(/(\d+)(?!.*\d)/);
+      return match ? match[1] : null;
+    }
+
+    const productId = normalizeProductId(wrapper.dataset.productId);
+    const tags = wrapper.dataset.productTags ? wrapper.dataset.productTags.split(',').map(t => t.trim().toLowerCase()) : [];
     const price = parseFloat(wrapper.dataset.productPrice || '0');
     const inventory = parseInt(wrapper.dataset.productInventory || '999', 10);
 
     if (!productId) return;
 
-    function isEligible(badge) {
-      if (badge.isActive === false || badge.status === 'INACTIVE') return false;
+    function isDeviceEligible(badge) {
+      const isMobile = window.matchMedia("(max-width: 749px)").matches;
+      if (isMobile && badge.hideOnMobile === true) return false;
+      if (!isMobile && badge.hideOnDesktop === true) return false;
+      return true;
+    }
 
-      const targetType = badge.targetType || (badge.isGlobal ? 'GLOBAL' : '');
+    function isEligible(badge) {
+      if (badge.enabled === false || badge.isActive === false || badge.status === 'INACTIVE') {
+        return false;
+      }
+
+      if (!isDeviceEligible(badge)) return false;
+
+      const targetType = badge.targetType || (badge.isGlobal ? 'GLOBAL' : 'GLOBAL');
 
       if (targetType === 'GLOBAL') return true;
 
       if (targetType === 'SPECIFIC_PRODUCTS' && Array.isArray(badge.productIds)) {
-        return badge.productIds.some(id => String(id).replace(/\D/g, "") === productId);
+        return badge.productIds.some(id => normalizeProductId(id) === productId);
       }
 
       if (targetType === 'PRODUCT_TAGS' && Array.isArray(badge.targetTags)) {
-        const formattedTargetTags = badge.targetTags.map(t => String(t).toLowerCase().trim());
-        return tags.some(t => formattedTargetTags.includes(t));
+        return tags.some(tag =>
+          badge.targetTags.map(t => String(t).trim().toLowerCase()).includes(tag)
+        );
       }
 
       if (targetType === 'INVENTORY_LEVEL') {
-        const min = badge.minInventory ?? 0;
-        const max = badge.maxInventory ?? Infinity;
+        const min = Number(badge.minInventory ?? 0);
+        const max = Number(badge.maxInventory ?? 999999);
         return inventory >= min && inventory <= max;
       }
 
       if (targetType === 'PRICE_RANGE') {
-        const min = badge.minPrice ?? 0;
-        const max = badge.maxPrice ?? Infinity;
+        const min = Number(badge.minPrice ?? 0);
+        const max = Number(badge.maxPrice ?? 999999999);
         return price >= min && price <= max;
       }
 
@@ -145,15 +163,14 @@
           const badgeEl = wrapper.querySelector('.fs-pdp-badge');
           
           badgeEl.addEventListener('click', () => {
-            fetch(API_ENDPOINT, {
+            fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(shop)}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ badgeId: matchingBadge.id, eventType: 'CLICK', productId }),
             });
           });
 
-          // Impression Track
-          fetch(API_ENDPOINT, {
+          fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(shop)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ badgeId: matchingBadge.id, eventType: 'IMPRESSION', productId }),

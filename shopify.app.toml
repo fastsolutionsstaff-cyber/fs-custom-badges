@@ -22,7 +22,8 @@ api_version = "2026-10"
   topics = [ "app/scopes_update" ]
 
 [access_scopes]
-scopes = "write_app_proxy"
+# Replace with the actual scopes your app requires to run
+scopes = "read_products,write_products"
 
 [auth]
 redirect_urls = [

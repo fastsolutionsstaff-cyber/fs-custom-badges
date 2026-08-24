@@ -25,6 +25,8 @@ model Session {
   emailVerified       Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
+
+  @@index([shop])
 }
 
 model AppSettings {
@@ -65,74 +67,93 @@ enum Position {
 }
 
 model Badge {
-  id               String         @id @default(uuid())
-  shop             String
-  name             String         @default("Conversion Campaign")
-  enabled          Boolean        @default(true)
-  priority         Int            @default(0) // Resolves overlap conflict
-  
+  id        String   @id @default(uuid())
+  shop      String
+  name      String   @default("Conversion Campaign")
+  enabled   Boolean  @default(true)
+  priority  Int      @default(0) // Higher number = higher display priority
+
   // Design & Typography
-  text             String         @default("BESTSELLER")
-  bgColor          String         @default("#DC2626")
-  textColor        String         @default("#FFFFFF")
-  borderColor      String?        @default("#B91C1C")
-  position         Position       @default(TOP_LEFT)
-  shape            BadgeShape     @default(PILL)
-  icon             String?        @default("🔥")
-  fontSize         Int            @default(12)
-  fontWeight       String         @default("bold")
-  paddingY         Int            @default(4)
-  paddingX         Int            @default(10)
-  borderRadius     Int            @default(20)
-  customCss        String?        @default("")
+  text         String     @default("BESTSELLER")
+  bgColor      String     @default("#DC2626")
+  textColor    String     @default("#FFFFFF")
+  borderColor  String?    @default("#B91C1C")
+  position     Position   @default(TOP_LEFT)
+  shape        BadgeShape @default(PILL)
+  icon         String?    @default("🔥")
+  fontSize     Int        @default(12)
+  fontWeight   String     @default("bold")
+  paddingY     Int        @default(4)
+  paddingX     Int        @default(10)
+  borderRadius Int        @default(20)
+  customCss    String?    @default("")
 
   // Device Visibility Controls
-  hideOnMobile     Boolean        @default(false)
-  hideOnDesktop    Boolean        @default(false)
-  
+  hideOnMobile  Boolean @default(false)
+  hideOnDesktop Boolean @default(false)
+
   // Advanced Rules & Targeting Engine
-  targetType       TargetType     @default(GLOBAL)
-  targetTags       String?        @default("") 
-  targetCollection String?        @default("")
-  minInventory     Int?           @default(0)
-  maxInventory     Int?           @default(9999)
-  minPrice         Float?         @default(0.00)
-  maxPrice         Float?         @default(99999.00)
-  
+  targetType       TargetType @default(GLOBAL)
+  targetTags       String?    @default("") // Comma-separated tags
+  targetCollection String?    @default("") // Collection GID or Handles
+  minInventory     Int?       @default(0)
+  maxInventory     Int?       @default(9999)
+  minPrice         Float?     @default(0.00)
+  maxPrice         Float?     @default(99999.00)
+
   // Scheduling & Expirations
-  startDate        DateTime?
-  endDate          DateTime?
-  
-  // Performance & Tracking
-  impressions      Int            @default(0)
-  clicks           Int            @default(0)
-  conversions      Int            @default(0)
-  revenueGenerated Float          @default(0.00)
-  
-  products         BadgeProduct[]
-  analyticsLogs    AnalyticsLog[]
-  
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  startDate DateTime?
+  endDate   DateTime?
+
+  // Performance & Aggregate Tracking
+  impressions       Int   @default(0)
+  clicks            Int   @default(0)
+  conversions       Int   @default(0)
+  revenueGenerated  Float @default(0.00)
+
+  // Relations
+  products      BadgeProduct[]
+  collections   BadgeCollection[]
+  analyticsLogs AnalyticsLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([shop, enabled, priority])
+  @@index([startDate, endDate])
 }
 
 model BadgeProduct {
   id        String @id @default(uuid())
   badgeId   String
-  productId String
-  badge     Badge  @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  productId String // Cleaned numeric ID or GID
+
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
 
   @@unique([badgeId, productId])
+  @@index([productId]) // Fast lookup when searching by Product
+}
+
+model BadgeCollection {
+  id           String @id @default(uuid())
+  badgeId      String
+  collectionId String
+
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([badgeId, collectionId])
+  @@index([collectionId])
 }
 
 model AnalyticsLog {
   id        String   @id @default(uuid())
+  shop      String   // Added for fast shop-level analytics filtering
   badgeId   String
   eventType String   // IMPRESSION, CLICK, CONVERSION
   timestamp DateTime @default(now())
-  badge     Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
 
   @@index([badgeId, eventType])
+  @@index([shop, timestamp])
 }
