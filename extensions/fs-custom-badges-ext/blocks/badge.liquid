@@ -1,8 +1,7 @@
 <style>
-  /* 1:1 Parity CSS Engine */
   .fs-badge-wrapper {
     position: absolute !important;
-    z-index: 999 !important;
+    z-index: 99 !important;
     pointer-events: none;
   }
   .fs-pos-TOP_LEFT { top: 10px; left: 10px; }
@@ -22,21 +21,13 @@
   .fs-shape-OUTLINE { background-color: transparent !important; border-width: 2px !important; border-style: solid !important; }
   .fs-shape-GLASSMORPHISM { backdrop-filter: blur(8px) !important; -webkit-backdrop-filter: blur(8px) !important; border-color: rgba(255,255,255,0.4) !important; box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important; }
   .fs-shape-FLOATING_GLOW { border-radius: 50px !important; border: none !important; box-shadow: 0 0 15px var(--fs-glow-color) !important; animation: fs-pulse 2s infinite alternate !important; }
-  
-  /* Premium Image Replications */
   .fs-shape-TAG { border-radius: 0 6px 6px 0 !important; clip-path: polygon(15px 0, 100% 0, 100% 100%, 15px 100%, 0 50%) !important; padding-left: calc(var(--fs-px) + 12px) !important; position: relative !important; }
-  .fs-shape-TAG::before { content: '' !important; position: absolute !important; left: 5px !important; top: 50% !important; transform: translateY(-50%) !important; width: 6px !important; height: 6px !important; background-color: rgba(255,255,255,0.8) !important; border-radius: 50% !important; box-shadow: 0 0 2px rgba(0,0,0,0.2); }
-  
   .fs-shape-BOOKMARK { border-radius: 6px 0 0 6px !important; clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 50%, 100% 100%, 0 100%) !important; padding-right: calc(var(--fs-px) + 12px) !important; }
-  
   .fs-shape-STARBURST { aspect-ratio: 1 !important; border-radius: 0 !important; clip-path: polygon(50% 0%, 61% 12%, 85% 12%, 85% 39%, 100% 50%, 85% 61%, 85% 88%, 61% 88%, 50% 100%, 39% 88%, 15% 88%, 15% 61%, 0% 50%, 15% 39%, 15% 12%, 39% 12%) !important; flex-direction: column !important; justify-content: center !important; text-align: center !important; white-space: normal !important; padding: calc(var(--fs-py) + 10px) !important; }
-  
   .fs-shape-DIAGONAL { transform: skewX(-15deg) !important; border-radius: 4px !important; }
   .fs-shape-DIAGONAL > * { transform: skewX(15deg) !important; }
-  
   .fs-shape-RIBBON { clip-path: polygon(0 0, 100% 0, 88% 50%, 100% 100%, 0 100%) !important; border-radius: 0 !important; padding-right: calc(var(--fs-px) + 12px) !important; }
   .fs-badge-icon-wrap { display: inline-flex !important; align-items: center !important; }
-  
   @keyframes fs-pulse { 0% { transform: scale(1); } 100% { transform: scale(1.05); } }
 </style>
 
@@ -44,8 +35,8 @@
   (function () {
     "use strict";
 
-    const API_ENDPOINT = "/apps/badges"; // Shopify App Proxy correct path
-    const FALLBACK_ENDPOINT = "https://fs-custom-badges.vercel.app/api/badges"; // Direct Vercel Backend URL
+    const API_ENDPOINT = "/apps/badges";
+    const FALLBACK_ENDPOINT = "https://fs-custom-badges.vercel.app/api/badges"; 
     const SHOP_DOMAIN = "{{ shop.permanent_domain }}";
 
     let badgeConfiguration = [];
@@ -58,7 +49,6 @@
 
     async function loadBadges() {
       try {
-        // 🔥 Strict Cache Busting logic applied here
         const timestamp = new Date().getTime();
         let response = await fetch(`${FALLBACK_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}&t=${timestamp}`, {
           method: "GET", headers: { "Accept": "application/json", "Cache-Control": "no-cache" }, credentials: "same-origin"
@@ -70,20 +60,28 @@
         if (!data.success || !Array.isArray(data.badges)) return false;
         
         badgeConfiguration = data.badges;
-        if (data.globalCustomCss && !document.getElementById("fs-badges-global-css")) {
-          const style = document.createElement("style");
-          style.id = "fs-badges-global-css";
-          style.textContent = data.globalCustomCss;
-          document.head.appendChild(style);
-        }
         return true;
       } catch (error) { return false; }
     }
 
     function getProductCards() {
-      const selectors = [".card-wrapper", ".card.product-card", ".product-card", "product-card", ".grid__item .card", "li.grid__item", "[data-product-id]", ".product__media-wrapper"];
+      const selectors = [
+        ".card-wrapper", 
+        ".card.product-card", 
+        ".product-card", 
+        "product-card", 
+        ".grid__item .card", 
+        "li.grid__item", 
+        ".card.wrapper",
+        "[data-product-id]"
+      ];
       const cards = new Set();
-      selectors.forEach((selector) => { document.querySelectorAll(selector).forEach((el) => cards.add(el)); });
+      selectors.forEach((selector) => { 
+        document.querySelectorAll(selector).forEach((el) => {
+          // Ensure we pick the main card container, not inner text elements
+          cards.add(el);
+        }); 
+      });
       return Array.from(cards);
     }
 
@@ -103,16 +101,39 @@
 
       cards.forEach((card) => {
         let productId = null;
-        if (card.dataset.productId) productId = cleanNumericId(card.dataset.productId);
+        
+        // Check standard data attributes or link hrefs containing product handles/IDs
+        if (card.dataset.productId) {
+          productId = cleanNumericId(card.dataset.productId);
+        }
+        
         if (!productId) {
           const idElem = card.querySelector("[data-product-id], [data-id], [id*='CardArticle-']");
           if (idElem) productId = cleanNumericId(idElem.dataset.productId || idElem.dataset.id || idElem.id);
         }
 
-        const match = badgeConfiguration.find((badge) => isEligible(badge, productId));
+        // Fallback: check product link URL if id not found directly
+        if (!productId) {
+          const linkElem = card.querySelector("a[href*='/products/']");
+          if (linkElem) {
+            // We can match by product handle or let global rules apply
+            productId = "global_match"; 
+          }
+        }
+
+        // Find matching badge (specific product or global)
+        const match = badgeConfiguration.find((badge) => {
+          if (badge.targetType === "SPECIFIC_PRODUCTS") {
+            return productId && (badge.productIds || []).map(cleanNumericId).includes(productId);
+          }
+          return isEligible(badge, productId);
+        });
+
         if (!match) return;
 
-        const targetMedia = card.querySelector(".card__media") || card.querySelector(".media") || card.querySelector(".product-card__image-wrapper") || card.querySelector(".card__inner") || card;
+        // Target image container precisely so badge sits on product image
+        const targetMedia = card.querySelector(".card__media") || card.querySelector(".media") || card.querySelector(".product-card__image-wrapper") || card.querySelector(".card__inner") || card.querySelector("img")?.parentElement || card;
+        
         if (targetMedia.querySelector(`[data-badge-id="${match.id}"]`)) return;
 
         fragmentQueue.push({ targetMedia, match });
@@ -120,7 +141,9 @@
 
       requestAnimationFrame(() => {
         fragmentQueue.forEach(({ targetMedia, match }) => {
-          if (window.getComputedStyle(targetMedia).position === "static") targetMedia.style.position = "relative";
+          if (window.getComputedStyle(targetMedia).position === "static") {
+            targetMedia.style.position = "relative";
+          }
 
           const wrapperEl = document.createElement("div");
           wrapperEl.className = `fs-badge-wrapper fs-pos-${match.position || 'TOP_LEFT'}`;
@@ -171,7 +194,7 @@
     let timeout;
     const observer = new MutationObserver(() => {
       clearTimeout(timeout);
-      timeout = setTimeout(applyBadges, 150);
+      timeout = setTimeout(applyBadges, 200);
     });
     if (document.body) observer.observe(document.body, { childList: true, subtree: true });
   })();

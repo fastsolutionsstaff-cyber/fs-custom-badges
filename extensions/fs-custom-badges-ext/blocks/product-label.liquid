@@ -27,14 +27,12 @@
 
 <style>
   .fs-pdp-label-wrapper { display: flex; align-items: center; width: 100%; }
-  
   .fs-badge-ui { display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; line-height: 1.2 !important; box-sizing: border-box !important; text-transform: uppercase !important; white-space: nowrap !important; transition: all 0.3s ease !important; cursor: pointer; }
   .fs-shape-PILL { border-radius: 50px !important; }
   .fs-shape-SHARP { border-radius: 0px !important; }
   .fs-shape-OUTLINE { background-color: transparent !important; border: 2px solid currentColor !important; }
   .fs-shape-GLASSMORPHISM { backdrop-filter: blur(8px) !important; -webkit-backdrop-filter: blur(8px) !important; border: 1px solid rgba(255,255,255,0.4) !important; box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important; }
   .fs-shape-TAG { border-radius: 0 6px 6px 0 !important; clip-path: polygon(15px 0, 100% 0, 100% 100%, 15px 100%, 0 50%) !important; padding-left: calc(var(--fs-px) + 12px) !important; position: relative !important; }
-  .fs-shape-TAG::before { content: '' !important; position: absolute !important; left: 5px !important; top: 50% !important; transform: translateY(-50%) !important; width: 6px !important; height: 6px !important; background-color: rgba(255,255,255,0.8) !important; border-radius: 50% !important; }
   .fs-shape-BOOKMARK { border-radius: 6px 0 0 6px !important; clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 50%, 100% 100%, 0 100%) !important; padding-right: calc(var(--fs-px) + 12px) !important; }
   .fs-shape-STARBURST { aspect-ratio: 1 !important; border-radius: 0 !important; clip-path: polygon(50% 0%, 61% 12%, 85% 12%, 85% 39%, 100% 50%, 85% 61%, 85% 88%, 61% 88%, 50% 100%, 39% 88%, 15% 88%, 15% 61%, 0% 50%, 15% 39%, 15% 12%, 39% 12%) !important; flex-direction: column !important; justify-content: center !important; text-align: center !important; white-space: normal !important; padding: calc(var(--fs-py) + 10px) !important; }
   .fs-shape-DIAGONAL { transform: skewX(-15deg) !important; border-radius: 4px !important; }
@@ -46,7 +44,8 @@
 <script>
   (function() {
     const wrapper = document.getElementById("fs-pdp-label-{{ block.id }}");
-    if (!wrapper) return;
+    if (!wrapper || wrapper.dataset.loaded === "true") return;
+    wrapper.dataset.loaded = "true";
 
     const API_ENDPOINT = '/apps/badges'; 
     const FALLBACK_ENDPOINT = 'https://fs-custom-badges.vercel.app/api/badges';
@@ -122,17 +121,6 @@
               ${textHtml}
             </span>
           `;
-
-          const badgeEl = wrapper.querySelector('.fs-badge-ui');
-          badgeEl.addEventListener('click', () => {
-            fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(shop)}`, {
-              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ badgeId: matchingBadge.id, eventType: 'CLICK', productId }),
-            }).catch(() => {});
-          });
-
-          fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(shop)}`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ badgeId: matchingBadge.id, eventType: 'IMPRESSION', productId }),
-          }).catch(() => {});
         }
       } catch (err) { }
     }
