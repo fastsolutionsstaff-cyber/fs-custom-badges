@@ -35,6 +35,11 @@
   (function () {
     "use strict";
 
+    // 🛑 STRICT GUARD: Do not run grid badge engine on Product Detail Pages (PDP)
+    if (window.location.pathname.includes('/products/')) {
+      return; 
+    }
+
     const API_ENDPOINT = "/apps/badges";
     const FALLBACK_ENDPOINT = "https://fs-custom-badges.vercel.app/api/badges"; 
     const SHOP_DOMAIN = "{{ shop.permanent_domain }}";
@@ -66,32 +71,14 @@
 
     function getProductCards() {
       const selectors = [
-        ".card-wrapper", 
-        ".card.product-card", 
-        ".product-card", 
-        "product-card", 
-        ".grid__item .card", 
-        "li.grid__item", 
-        ".card.wrapper",
-        "[data-product-id]"
+        ".card-wrapper", ".card.product-card", ".product-card", "product-card", 
+        ".grid__item .card", "li.grid__item", ".card", ".product-item", "[data-product-id]"
       ];
       const cards = new Set();
       selectors.forEach((selector) => { 
-        document.querySelectorAll(selector).forEach((el) => {
-          // Ensure we pick the main card container, not inner text elements
-          cards.add(el);
-        }); 
+        document.querySelectorAll(selector).forEach((el) => cards.add(el)); 
       });
       return Array.from(cards);
-    }
-
-    function isEligible(badge, productId) {
-      if (!badge.enabled) return false;
-      if (badge.targetType === "GLOBAL" || badge.isGlobal) return true;
-      if (badge.targetType === "SPECIFIC_PRODUCTS" && productId) {
-        return (badge.productIds || []).map(cleanNumericId).includes(productId);
-      }
-      return false;
     }
 
     function applyBadges() {
@@ -101,40 +88,28 @@
 
       cards.forEach((card) => {
         let productId = null;
-        
-        // Check standard data attributes or link hrefs containing product handles/IDs
         if (card.dataset.productId) {
           productId = cleanNumericId(card.dataset.productId);
         }
-        
         if (!productId) {
           const idElem = card.querySelector("[data-product-id], [data-id], [id*='CardArticle-']");
           if (idElem) productId = cleanNumericId(idElem.dataset.productId || idElem.dataset.id || idElem.id);
         }
 
-        // Fallback: check product link URL if id not found directly
-        if (!productId) {
-          const linkElem = card.querySelector("a[href*='/products/']");
-          if (linkElem) {
-            // We can match by product handle or let global rules apply
-            productId = "global_match"; 
-          }
-        }
-
-        // Find matching badge (specific product or global)
         const match = badgeConfiguration.find((badge) => {
-          if (badge.targetType === "SPECIFIC_PRODUCTS") {
-            return productId && (badge.productIds || []).map(cleanNumericId).includes(productId);
+          if (!badge.enabled) return false;
+          if (badge.targetType === "GLOBAL" || badge.isGlobal) return true;
+          if (badge.targetType === "SPECIFIC_PRODUCTS" && productId) {
+            return (badge.productIds || []).map(cleanNumericId).includes(productId);
           }
-          return isEligible(badge, productId);
+          return false;
         });
 
         if (!match) return;
 
-        // Target image container precisely so badge sits on product image
-        const targetMedia = card.querySelector(".card__media") || card.querySelector(".media") || card.querySelector(".product-card__image-wrapper") || card.querySelector(".card__inner") || card.querySelector("img")?.parentElement || card;
+        const targetMedia = card.querySelector(".card__media") || card.querySelector(".media") || card.querySelector(".product-card__image-wrapper") || card.querySelector(".card__inner") || card.querySelector("img")?.parentElement;
         
-        if (targetMedia.querySelector(`[data-badge-id="${match.id}"]`)) return;
+        if (!targetMedia || targetMedia.querySelector(`[data-badge-id="${match.id}"]`)) return;
 
         fragmentQueue.push({ targetMedia, match });
       });
