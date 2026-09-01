@@ -7,18 +7,21 @@ function cleanProductId(id) {
 }
 
 export const loader = async ({ request }) => {
-  const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
-  const rawProductId = url.searchParams.get("productId");
-
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, OPTIONS, POST",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Cache-Control",
     "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
-    "Pragma": "no-cache",
-    "Expires": "0",
   };
+
+  // Handle CORS Preflight OPTIONS request
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  const url = new URL(request.url);
+  const shop = url.searchParams.get("shop");
+  const rawProductId = url.searchParams.get("productId");
 
   if (!shop) {
     return json({ success: false, error: "Shop parameter missing" }, { status: 400, headers: corsHeaders });
