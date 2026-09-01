@@ -1,3 +1,4 @@
+{% unless request.page_type == 'product' %}
 <script>
   document.addEventListener("DOMContentLoaded", async function() {
     // Apki app proxy ka URL
@@ -22,7 +23,7 @@
         const productCards = document.querySelectorAll(cardSelector);
 
         productCards.forEach(card => {
-          // Extract product ID or handle from card (adjust attribute based on theme)
+          // Extract product ID or handle from card
           const productLink = card.querySelector('a[href*="/products/"]');
           if (!productLink) return;
 
@@ -69,6 +70,7 @@
     }
   });
 </script>
+{% endunless %}
 
 {% schema %}
 {
