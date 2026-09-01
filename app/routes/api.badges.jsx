@@ -1,5 +1,5 @@
 import { json } from "@remix-run/node";
-import db from "../db.server";
+import db from "../db.server"; // Adjust path according to your db connection file
 
 function cleanProductId(id) {
   if (!id) return "";
@@ -13,9 +13,9 @@ export const loader = async ({ request }) => {
 
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
-    "Cache-Control": "public, max-age=15, s-maxage=30",
+    "Cache-Control": "public, max-age=30, s-maxage=60",
   };
 
   if (!shop) {
@@ -24,19 +24,27 @@ export const loader = async ({ request }) => {
 
   const now = new Date();
 
-  try {
-    const badges = await db.badge.findMany({
-      where: {
-        shop,
-        enabled: true,
-        OR: [{ startDate: null }, { startDate: { lte: now } }],
-        AND: [{ OR: [{ endDate: null }, { endDate: { gte: now } }] }],
-      },
-      include: { products: true },
-      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
-    });
+  // Active / Enabled badges fetch kar rahe hain
+  const badges = await db.badge.findMany({
+    where: {
+      shop,
+      enabled: true,
+      OR: [{ startDate: null }, { startDate: { lte: now } }],
+      AND: [{ OR: [{ endDate: null }, { endDate: { gte: now } }] }],
+    },
+    include: {
+      products: true,
+    },
+    orderBy: [
+      { priority: "desc" },
+      { createdAt: "desc" },
+    ],
+  });
 
-    const formattedBadges = badges.map((b) => ({
+  const formattedBadges = badges.map((b) => {
+    const productIds = b.products ? b.products.map((p) => cleanProductId(p.productId)) : [];
+    
+    return {
       id: b.id,
       name: b.name,
       enabled: b.enabled,
@@ -54,57 +62,36 @@ export const loader = async ({ request }) => {
       borderRadius: b.borderRadius,
       priority: b.priority,
       targetType: b.targetType,
-      productIds: b.products ? b.products.map((p) => cleanProductId(p.productId)) : [],
+      productIds: productIds,
       isGlobal: b.targetType === "GLOBAL",
-      customCss: b.customCss || "",
-    }));
+      customCss: b.customCss || ""
+    };
+  });
 
-    let filteredBadges = formattedBadges;
-    if (rawProductId) {
-      const cleanId = cleanProductId(rawProductId);
-      filteredBadges = formattedBadges.filter((badge) => {
-        if (badge.targetType === "GLOBAL" || badge.isGlobal) return true;
-        if (badge.targetType === "SPECIFIC_PRODUCTS") {
-          return badge.productIds.includes(cleanId);
-        }
-        return true;
-      });
-    }
-
-    const settings = await db.appSettings.findUnique({
-      where: { shop },
-      select: { globalCustomCss: true },
-    });
-
-    return json(
-      { success: true, badges: filteredBadges, globalCustomCss: settings?.globalCustomCss || "" },
-      { headers: corsHeaders }
-    );
-  } catch (error) {
-    return json({ success: false, error: error.message }, { status: 500, headers: corsHeaders });
-  }
-};
-
-export const action = async ({ request }) => {
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-  };
-
-  try {
-    const body = await request.json();
-    const { badgeId, eventType } = body;
-
-    if (badgeId && eventType) {
-      if (eventType === "IMPRESSION") {
-        await db.badge.update({ where: { id: badgeId }, data: { impressions: { increment: 1 } } });
-      } else if (eventType === "CLICK") {
-        await db.badge.update({ where: { id: badgeId }, data: { clicks: { increment: 1 } } });
+  // Agar specific single product PDP route par request aayi ho
+  let filteredBadges = formattedBadges;
+  if (rawProductId) {
+    const cleanId = cleanProductId(rawProductId);
+    filteredBadges = formattedBadges.filter((badge) => {
+      if (badge.targetType === "GLOBAL" || badge.isGlobal) return true;
+      if (badge.targetType === "SPECIFIC_PRODUCTS") {
+        return badge.productIds.includes(cleanId);
       }
-    }
-    return json({ success: true }, { headers: corsHeaders });
-  } catch {
-    return json({ success: false }, { status: 400, headers: corsHeaders });
+      return true;
+    });
   }
+
+  const settings = await db.appSettings.findUnique({
+    where: { shop },
+    select: { globalCustomCss: true },
+  });
+
+  return json(
+    {
+      success: true,
+      badges: filteredBadges,
+      globalCustomCss: settings?.globalCustomCss || "",
+    },
+    { headers: corsHeaders }
+  );
 };
