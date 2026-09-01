@@ -1,0 +1,87 @@
+<script>
+  document.addEventListener("DOMContentLoaded", async function() {
+    // Apki app proxy ka URL
+    const shopDomain = Shopify.shop || "{{ shop.permanent_domain }}";
+    const apiUrl = `/apps/badges?shop=${shopDomain}`;
+
+    try {
+      const response = await fetch(apiUrl);
+      const data = await response.json();
+
+      if (data.success && data.badges && data.badges.length > 0) {
+        
+        // 1. Inject Global Custom CSS
+        if (data.globalCustomCss) {
+          const style = document.createElement('style');
+          style.innerHTML = data.globalCustomCss;
+          document.head.appendChild(style);
+        }
+
+        // 2. Theme Customizer Selector (Default for Dawn and similar themes)
+        const cardSelector = "{{ block.settings.card_selector }}";
+        const productCards = document.querySelectorAll(cardSelector);
+
+        productCards.forEach(card => {
+          // Extract product ID or handle from card (adjust attribute based on theme)
+          const productLink = card.querySelector('a[href*="/products/"]');
+          if (!productLink) return;
+
+          // Badges ko filter aur inject karne ka logic
+          const globalBadges = data.badges.filter(b => b.isGlobal);
+          
+          if (globalBadges.length > 0) {
+            const badge = globalBadges[0]; // Highest priority badge
+            const badgeElement = document.createElement('div');
+            
+            // Apply Database Styles
+            const bg = badge.shape === 'OUTLINE' ? 'transparent' : badge.bgColor;
+            const color = badge.shape === 'OUTLINE' ? badge.bgColor : badge.textColor;
+            const border = `1px solid ${badge.borderColor || badge.bgColor}`;
+            const radius = badge.shape === 'PILL' ? '999px' : (badge.shape === 'SHARP' ? '0px' : badge.borderRadius + 'px');
+            
+            badgeElement.style.cssText = `
+              position: absolute;
+              top: 10px;
+              left: 10px;
+              z-index: 2;
+              background: ${bg};
+              color: ${color};
+              border: ${border};
+              border-radius: ${radius};
+              padding: ${badge.paddingY}px ${badge.paddingX}px;
+              font-size: ${badge.fontSize}px;
+              font-weight: ${badge.fontWeight};
+              display: inline-flex;
+              align-items: center;
+              gap: 4px;
+              ${badge.customCss}
+            `;
+            
+            badgeElement.innerHTML = `${badge.icon ? `<span>${badge.icon}</span>` : ''} <span>${badge.text}</span>`;
+            
+            card.style.position = 'relative'; // Ensure parent is relative
+            card.appendChild(badgeElement);
+          }
+        });
+      }
+    } catch (error) {
+      console.error("FS Custom Badges Error:", error);
+    }
+  });
+</script>
+
+{% schema %}
+{
+  "name": "Auto Grid Badges",
+  "target": "body",
+  "settings": [
+    {
+      "type": "text",
+      "id": "card_selector",
+      "label": "Product Card Selector",
+      "default": ".card, .product-card, .grid-view-item",
+      "info": "CSS selector for product grid items (e.g. .card for Dawn theme)"
+    }
+  ]
+}
+{% endschema %}
