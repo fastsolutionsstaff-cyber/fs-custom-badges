@@ -1,188 +1,199 @@
-<style>
-  .fs-badge-wrapper {
-    position: absolute !important;
-    z-index: 99 !important;
-    pointer-events: none;
-  }
-  .fs-pos-TOP_LEFT { top: 10px; left: 10px; }
-  .fs-pos-TOP_RIGHT { top: 10px; right: 10px; }
-  .fs-pos-BOTTOM_LEFT { bottom: 10px; left: 10px; }
-  .fs-pos-BOTTOM_RIGHT { bottom: 10px; right: 10px; }
-  .fs-pos-CENTER_OVERLAY { top: 50%; left: 50%; transform: translate(-50%, -50%); }
-
-  .fs-badge-ui {
-    display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important;
-    line-height: 1.2 !important; box-sizing: border-box !important; text-transform: uppercase !important;
-    white-space: nowrap !important; transition: all 0.3s ease !important; border: 1px solid transparent;
-  }
-  
-  .fs-shape-PILL { border-radius: 50px !important; }
-  .fs-shape-SHARP { border-radius: 0px !important; }
-  .fs-shape-OUTLINE { background-color: transparent !important; border-width: 2px !important; border-style: solid !important; }
-  .fs-shape-GLASSMORPHISM { backdrop-filter: blur(8px) !important; -webkit-backdrop-filter: blur(8px) !important; border-color: rgba(255,255,255,0.4) !important; box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important; }
-  .fs-shape-FLOATING_GLOW { border-radius: 50px !important; border: none !important; box-shadow: 0 0 15px var(--fs-glow-color) !important; animation: fs-pulse 2s infinite alternate !important; }
-  .fs-shape-TAG { border-radius: 0 6px 6px 0 !important; clip-path: polygon(15px 0, 100% 0, 100% 100%, 15px 100%, 0 50%) !important; padding-left: calc(var(--fs-px) + 12px) !important; position: relative !important; }
-  .fs-shape-BOOKMARK { border-radius: 6px 0 0 6px !important; clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 50%, 100% 100%, 0 100%) !important; padding-right: calc(var(--fs-px) + 12px) !important; }
-  .fs-shape-STARBURST { aspect-ratio: 1 !important; border-radius: 0 !important; clip-path: polygon(50% 0%, 61% 12%, 85% 12%, 85% 39%, 100% 50%, 85% 61%, 85% 88%, 61% 88%, 50% 100%, 39% 88%, 15% 88%, 15% 61%, 0% 50%, 15% 39%, 15% 12%, 39% 12%) !important; flex-direction: column !important; justify-content: center !important; text-align: center !important; white-space: normal !important; padding: calc(var(--fs-py) + 10px) !important; }
-  .fs-shape-DIAGONAL { transform: skewX(-15deg) !important; border-radius: 4px !important; }
-  .fs-shape-DIAGONAL > * { transform: skewX(15deg) !important; }
-  .fs-shape-RIBBON { clip-path: polygon(0 0, 100% 0, 88% 50%, 100% 100%, 0 100%) !important; border-radius: 0 !important; padding-right: calc(var(--fs-px) + 12px) !important; }
-  .fs-badge-icon-wrap { display: inline-flex !important; align-items: center !important; }
-  @keyframes fs-pulse { 0% { transform: scale(1); } 100% { transform: scale(1.05); } }
-</style>
+{%- comment -%}
+  Professional Storefront Product Grid Badges Engine
+{%- endcomment -%}
 
 <script>
   (function () {
     "use strict";
 
-    // 🛑 Hard stop if on a product page route
-    if (window.location.pathname.includes('/products/')) {
-      return; 
-    }
-
     const API_ENDPOINT = "/apps/badges";
-    const FALLBACK_ENDPOINT = "https://fs-custom-badges.vercel.app/api/badges"; 
+    const FALLBACK_ENDPOINT = "/api/badges";
     const SHOP_DOMAIN = "{{ shop.permanent_domain }}";
 
     let badgeConfiguration = [];
 
     function cleanNumericId(val) {
       if (!val) return null;
-      const match = String(val).match(/(\d+)/g);
+      const str = String(val);
+      const match = str.match(/(\d+)/g);
       return match ? match.join("") : null;
     }
 
     async function loadBadges() {
       try {
-        const timestamp = new Date().getTime();
-        let response = await fetch(`${FALLBACK_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}&t=${timestamp}`, {
-          method: "GET", headers: { "Accept": "application/json", "Cache-Control": "no-cache" }, credentials: "same-origin"
+        let response = await fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`, {
+          method: "GET",
+          headers: { "Accept": "application/json" },
+          cache: "no-store"
         });
-        if (!response.ok) response = await fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}&t=${timestamp}`, { headers: { "Cache-Control": "no-cache" } });
+
+        if (!response.ok) {
+          response = await fetch(`${FALLBACK_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`);
+        }
+
         if (!response.ok) return false;
 
         const data = await response.json();
         if (!data.success || !Array.isArray(data.badges)) return false;
-        
+
         badgeConfiguration = data.badges;
+
+        if (data.globalCustomCss && !document.getElementById("fs-badges-global-css")) {
+          const style = document.createElement("style");
+          style.id = "fs-badges-global-css";
+          style.textContent = data.globalCustomCss;
+          document.head.appendChild(style);
+        }
+
         return true;
-      } catch (error) { return false; }
+      } catch (error) {
+        return false;
+      }
     }
 
     function getProductCards() {
       const selectors = [
-        ".card-wrapper", ".card.product-card", ".product-card", "product-card", 
-        ".grid__item .card", "li.grid__item", ".card", ".product-item", "[data-product-id]"
+        ".card-wrapper",
+        ".card.product-card",
+        ".product-card",
+        "product-card",
+        ".grid__item .card",
+        "li.grid__item",
+        "[data-product-id]",
+        ".product__media-wrapper",
+        ".card__inner"
       ];
+
       const cards = new Set();
-      selectors.forEach((selector) => { 
-        document.querySelectorAll(selector).forEach((el) => {
-          // Ignore if card belongs to main product section of PDP
-          if (!el.closest('section[id*="main-product"], .product-section, .product-main, form[action*="/cart/add"]')) {
-            cards.add(el);
-          }
-        }); 
+      selectors.forEach((selector) => {
+        document.querySelectorAll(selector).forEach((el) => cards.add(el));
       });
       return Array.from(cards);
+    }
+
+    function getProductData(card) {
+      let productId = null;
+      if (card.dataset.productId) {
+        productId = cleanNumericId(card.dataset.productId);
+      }
+      if (!productId) {
+        const idElem = card.querySelector("[data-product-id], [data-id], [id*='CardArticle-']");
+        if (idElem) {
+          productId = cleanNumericId(idElem.dataset.productId || idElem.dataset.id || idElem.id);
+        }
+      }
+      return { productId };
+    }
+
+    function isEligible(badge, productData) {
+      if (!badge.enabled) return false;
+      if (badge.targetType === "GLOBAL" || badge.isGlobal) return true;
+      if (badge.targetType === "SPECIFIC_PRODUCTS") {
+        if (!productData.productId) return false;
+        const targetIds = (badge.productIds || []).map((id) => cleanNumericId(id));
+        return targetIds.includes(productData.productId);
+      }
+      return false;
+    }
+
+    function renderBadge(card, badge) {
+      const targetMedia =
+        card.querySelector(".card__media") ||
+        card.querySelector(".media") ||
+        card.querySelector(".product-card__image-wrapper") ||
+        card.querySelector(".card__inner") ||
+        card;
+
+      if (targetMedia.querySelector(`[data-badge-id="${badge.id}"]`)) return;
+
+      if (window.getComputedStyle(targetMedia).position === "static") {
+        targetMedia.style.position = "relative";
+      }
+
+      const badgeEl = document.createElement("div");
+      badgeEl.className = "fs-custom-storefront-badge";
+      badgeEl.dataset.badgeId = badge.id;
+
+      let posCSS = "top: 10px; left: 10px;";
+      if (badge.position === "TOP_RIGHT") posCSS = "top: 10px; right: 10px;";
+      else if (badge.position === "BOTTOM_LEFT") posCSS = "bottom: 10px; left: 10px;";
+      else if (badge.position === "BOTTOM_RIGHT") posCSS = "bottom: 10px; right: 10px;";
+
+      badgeEl.style.cssText = `
+        position: absolute !important;
+        ${posCSS}
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px;
+        padding: ${badge.paddingY || 6}px ${badge.paddingX || 14}px;
+        background-color: ${badge.bgColor || "#111827"} !important;
+        color: ${badge.textColor || "#FFFFFF"} !important;
+        border: 1.5px solid ${badge.borderColor || badge.bgColor || "#374151"};
+        border-radius: ${badge.shape === "PILL" ? "999px" : `${badge.borderRadius || 25}px`};
+        font-size: ${badge.fontSize || 12}px;
+        font-weight: ${badge.fontWeight || "bold"};
+        z-index: 99 !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        pointer-events: none;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      `;
+
+      if (badge.icon) {
+        const iconSpan = document.createElement("span");
+        iconSpan.textContent = badge.icon;
+        badgeEl.appendChild(iconSpan);
+      }
+
+      const textSpan = document.createElement("span");
+      textSpan.textContent = badge.text || "BADGE";
+      badgeEl.appendChild(textSpan);
+
+      targetMedia.appendChild(badgeEl);
+
+      // Track impression
+      fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ badgeId: badge.id, eventType: "IMPRESSION" }),
+      }).catch(() => {});
     }
 
     function applyBadges() {
       if (!badgeConfiguration.length) return;
       const cards = getProductCards();
-      const fragmentQueue = []; 
-
       cards.forEach((card) => {
-        let productId = null;
-        if (card.dataset.productId) {
-          productId = cleanNumericId(card.dataset.productId);
+        const productData = getProductData(card);
+        const match = badgeConfiguration.find((badge) => isEligible(badge, productData));
+        if (match) {
+          renderBadge(card, match);
         }
-        if (!productId) {
-          const idElem = card.querySelector("[data-product-id], [data-id], [id*='CardArticle-']");
-          if (idElem) productId = cleanNumericId(idElem.dataset.productId || idElem.dataset.id || idElem.id);
-        }
-
-        const match = badgeConfiguration.find((badge) => {
-          if (!badge.enabled) return false;
-          if (badge.targetType === "GLOBAL" || badge.isGlobal) return true;
-          if (badge.targetType === "SPECIFIC_PRODUCTS" && productId) {
-            return (badge.productIds || []).map(cleanNumericId).includes(productId);
-          }
-          return false;
-        });
-
-        if (!match) return;
-
-        const targetMedia = card.querySelector(".card__media") || card.querySelector(".media") || card.querySelector(".product-card__image-wrapper") || card.querySelector(".card__inner") || card.querySelector("img")?.parentElement;
-        
-        if (!targetMedia || targetMedia.querySelector(`[data-badge-id="${match.id}"]`)) return;
-
-        fragmentQueue.push({ targetMedia, match });
-      });
-
-      requestAnimationFrame(() => {
-        fragmentQueue.forEach(({ targetMedia, match }) => {
-          if (window.getComputedStyle(targetMedia).position === "static") {
-            targetMedia.style.position = "relative";
-          }
-
-          const wrapperEl = document.createElement("div");
-          wrapperEl.className = `fs-badge-wrapper fs-pos-${match.position || 'TOP_LEFT'}`;
-          wrapperEl.dataset.badgeId = match.id;
-
-          const badgeEl = document.createElement("div");
-          badgeEl.className = `fs-badge-ui fs-shape-${match.shape || 'PILL'}`;
-
-          let finalBg = match.bgColor || "#111827";
-          if (match.shape === "GLASSMORPHISM") finalBg = finalBg + "99"; 
-
-          badgeEl.style.cssText = `
-            padding: ${match.paddingY || 4}px ${match.paddingX || 10}px !important;
-            background-color: ${match.shape === 'OUTLINE' ? 'transparent' : finalBg} !important;
-            color: ${match.shape === 'OUTLINE' ? match.bgColor : (match.textColor || "#FFFFFF")} !important;
-            border-color: ${match.borderColor || match.bgColor || "#000000"} !important;
-            font-size: ${match.fontSize || 12}px !important;
-            font-weight: ${match.fontWeight || "bold"} !important;
-            border-radius: ${match.borderRadius || 20}px !important;
-            --fs-px: ${match.paddingX || 10}px;
-            --fs-py: ${match.paddingY || 4}px;
-            --fs-glow-color: ${match.bgColor}80;
-          `;
-
-          let innerHTML = '';
-          if (match.icon) innerHTML += `<span class="fs-badge-icon-wrap">${match.icon}</span>`;
-          if (match.shape === 'DIAGONAL') {
-              innerHTML += `<span><span>${match.text || "BADGE"}</span></span>`;
-          } else {
-              innerHTML += `<span>${match.text || "BADGE"}</span>`;
-          }
-          
-          badgeEl.innerHTML = innerHTML;
-          wrapperEl.appendChild(badgeEl);
-          targetMedia.appendChild(wrapperEl);
-        });
       });
     }
 
     async function init() {
       const loaded = await loadBadges();
-      if (loaded) applyBadges();
+      if (loaded) {
+        applyBadges();
+      }
     }
 
-    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
-    else init();
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", init);
+    } else {
+      init();
+    }
 
-    let timeout;
-    const observer = new MutationObserver(() => {
-      clearTimeout(timeout);
-      timeout = setTimeout(applyBadges, 200);
-    });
-    if (document.body) observer.observe(document.body, { childList: true, subtree: true });
+    const observer = new MutationObserver(() => applyBadges());
+    if (document.body) {
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
   })();
 </script>
 
 {% schema %}
 {
-  "name": "Badge Engine Embed",
+  "name": "Badge Engine Embed Pro",
   "target": "body",
   "settings": []
 }

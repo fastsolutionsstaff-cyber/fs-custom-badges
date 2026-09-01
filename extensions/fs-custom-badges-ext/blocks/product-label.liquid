@@ -1,6 +1,7 @@
 {%- comment -%}
-  Product Label Block for Product Details Page (PDP)
+  Product Label Block for Product Details Page (PDP) - Pro
 {%- endcomment -%}
+
 {% assign current_product = product %}
 
 {% if current_product %}
@@ -10,140 +11,112 @@
   data-product-id="{{ current_product.id }}"
   data-product-tags="{{ current_product.tags | join: ',' | downcase }}"
   data-product-price="{{ current_product.price | divided_by: 100.0 }}"
-  data-product-inventory="{% if current_product.selected_or_first_available_variant.inventory_management %}{{ current_product.selected_or_first_available_variant.inventory_quantity }}{% else %}999{% endif %}"
   style="
-    margin-top: {{ block.settings.margin_top | default: 8 }}px;
-    margin-bottom: {{ block.settings.margin_bottom | default: 12 }}px;
+    --label-bg-color: {{ block.settings.bg_color }};
+    --label-text-color: {{ block.settings.text_color }};
+    --label-font-size: {{ block.settings.font_size }}px;
+    --label-border-radius: {{ block.settings.border_radius }}px;
+    --label-padding-v: {{ block.settings.padding_vertical }}px;
+    --label-padding-h: {{ block.settings.padding_horizontal }}px;
+    --label-margin-top: {{ block.settings.margin_top }}px;
+    --label-margin-bottom: {{ block.settings.margin_bottom }}px;
   "
 >
-  <span class="fs-badge-ui fs-shape-{{ block.settings.badge_shape | default: 'PILL' | upcase }}" style="background-color: {{ block.settings.bg_color | default: '#111111' }}; color: {{ block.settings.text_color | default: '#FFFFFF' }}; padding: {{ block.settings.padding_vertical | default: 6 }}px {{ block.settings.padding_horizontal | default: 14 }}px; font-size: {{ block.settings.font_size | default: 13 }}px; border-radius: {{ block.settings.border_radius | default: 20 }}px;">
+  <span class="fs-pdp-badge fs-shape-{{ block.settings.badge_shape }}">
     {% if block.settings.show_icon and block.settings.default_icon != blank %}
-      <span class="fs-badge-icon-wrap">{{ block.settings.default_icon }}</span>
+      <span class="fs-badge-icon">{{ block.settings.default_icon }}</span>
     {% endif %}
-    <span>{{ block.settings.preview_text | default: "⚡ LIMITED STOCK" }}</span>
+    <span class="fs-badge-text">{{ block.settings.preview_text | default: "⚡ LIMITED STOCK" }}</span>
   </span>
 </div>
-{% endif %}
 
 <style>
-  .fs-pdp-label-wrapper { display: flex; align-items: center; width: 100%; }
-  .fs-badge-ui { display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; line-height: 1.2 !important; box-sizing: border-box !important; text-transform: uppercase !important; white-space: nowrap !important; transition: all 0.3s ease !important; cursor: pointer; font-weight: 800; }
-  .fs-shape-PILL { border-radius: 50px !important; }
-  .fs-shape-SHARP { border-radius: 0px !important; }
-  .fs-shape-OUTLINE { background-color: transparent !important; border: 2px solid currentColor !important; }
-  .fs-shape-GLASSMORPHISM { backdrop-filter: blur(8px) !important; -webkit-backdrop-filter: blur(8px) !important; border: 1px solid rgba(255,255,255,0.4) !important; box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important; }
-  .fs-shape-TAG { border-radius: 0 6px 6px 0 !important; clip-path: polygon(15px 0, 100% 0, 100% 100%, 15px 100%, 0 50%) !important; padding-left: 18px !important; position: relative !important; }
-  .fs-shape-BOOKMARK { border-radius: 6px 0 0 6px !important; clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 50%, 100% 100%, 0 100%) !important; padding-right: 18px !important; }
-  .fs-shape-STARBURST { aspect-ratio: 1 !important; border-radius: 0 !important; clip-path: polygon(50% 0%, 61% 12%, 85% 12%, 85% 39%, 100% 50%, 85% 61%, 85% 88%, 61% 88%, 50% 100%, 39% 88%, 15% 88%, 15% 61%, 0% 50%, 15% 39%, 15% 12%, 39% 12%) !important; flex-direction: column !important; justify-content: center !important; text-align: center !important; white-space: normal !important; padding: 12px !important; }
-  .fs-shape-DIAGONAL { transform: skewX(-15deg) !important; border-radius: 4px !important; }
-  .fs-shape-DIAGONAL > * { transform: skewX(15deg) !important; }
-  .fs-shape-RIBBON { clip-path: polygon(0 0, 100% 0, 88% 50%, 100% 100%, 0 100%) !important; border-radius: 0 !important; padding-right: 18px !important; }
-  .fs-badge-icon-wrap { display: inline-flex !important; align-items: center !important; }
+  .fs-pdp-label-wrapper {
+    display: flex;
+    align-items: center;
+    margin-top: var(--label-margin-top);
+    margin-bottom: var(--label-margin-bottom);
+    width: 100%;
+  }
+  .fs-pdp-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background-color: var(--label-bg-color);
+    color: var(--label-text-color);
+    font-size: var(--label-font-size);
+    font-weight: 700;
+    padding: var(--label-padding-v) var(--label-padding-h);
+    border-radius: var(--label-border-radius);
+    text-transform: uppercase;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+  }
+  .fs-pdp-badge.fs-shape-pill { border-radius: 999px; }
+  .fs-pdp-badge.fs-shape-rounded { border-radius: 12px; }
+  .fs-pdp-badge.fs-shape-sharp { border-radius: 0px; }
 </style>
 
 <script>
   (function() {
     const wrapper = document.getElementById("fs-pdp-label-{{ block.id }}");
-    if (!wrapper || wrapper.dataset.rendered === "true") return;
-    wrapper.dataset.rendered = "true";
+    if (!wrapper) return;
 
-    const API_ENDPOINT = '/apps/badges'; 
-    const FALLBACK_ENDPOINT = 'https://fs-custom-badges.vercel.app/api/badges';
+    const API_ENDPOINT = '/apps/badges';
     const shop = "{{ shop.permanent_domain }}";
 
     function normalizeProductId(value) {
       if (!value) return null;
-      const match = String(value).match(/(\d+)(?!.*\d)/);
+      const match = String(value).match(/(\d+)/);
       return match ? match[1] : null;
     }
 
     const productId = normalizeProductId(wrapper.dataset.productId);
-    const tags = wrapper.dataset.productTags ? wrapper.dataset.productTags.split(',').map(t => t.trim().toLowerCase()) : [];
-    const price = parseFloat(wrapper.dataset.productPrice || '0');
-    const inventory = parseInt(wrapper.dataset.productInventory || '999', 10);
-
     if (!productId) return;
-
-    function isEligible(badge) {
-      if (badge.enabled === false) return false;
-      const targetType = badge.targetType || (badge.isGlobal ? 'GLOBAL' : 'GLOBAL');
-      if (targetType === 'GLOBAL') return true;
-      if (targetType === 'SPECIFIC_PRODUCTS' && Array.isArray(badge.productIds)) return badge.productIds.some(id => normalizeProductId(id) === productId);
-      if (targetType === 'PRODUCT_TAGS' && Array.isArray(badge.targetTags)) return tags.some(tag => badge.targetTags.map(t => String(t).trim().toLowerCase()).includes(tag));
-      if (targetType === 'INVENTORY_LEVEL') return inventory >= Number(badge.minInventory ?? 0) && inventory <= Number(badge.maxInventory ?? 999999);
-      if (targetType === 'PRICE_RANGE') return price >= Number(badge.minPrice ?? 0) && price <= Number(badge.maxPrice ?? 999999999);
-      return false;
-    }
 
     async function fetchPDPLabel() {
       try {
-        const timestamp = new Date().getTime(); 
-        let response = await fetch(`${FALLBACK_ENDPOINT}?shop=${encodeURIComponent(shop)}&t=${timestamp}`, { headers: { "Cache-Control": "no-cache" } });
-        if (!response.ok) response = await fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(shop)}&t=${timestamp}`, { headers: { "Cache-Control": "no-cache" } });
+        const response = await fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(shop)}&productId=${productId}`);
         if (!response.ok) return;
 
         const data = await response.json();
         if (!data.badges || data.badges.length === 0) return;
 
-        const matchingBadge = data.badges.find(badge => isEligible(badge));
-
+        const matchingBadge = data.badges[0];
         if (matchingBadge) {
-          const badgeShape = (matchingBadge.shape || "PILL").toUpperCase();
-          let finalBg = matchingBadge.bgColor;
-          if (badgeShape === "GLASSMORPHISM") finalBg += "99";
-
-          const iconHtml = matchingBadge.icon ? `<span class="fs-badge-icon-wrap">${matchingBadge.icon}</span>` : "";
-          const textHtml = badgeShape === "DIAGONAL" ? `<span><span>${matchingBadge.text}</span></span>` : `<span>${matchingBadge.text}</span>`;
-
+          const iconHtml = matchingBadge.icon ? `<span>${matchingBadge.icon}</span>` : "";
           wrapper.innerHTML = `
-            <span class="fs-badge-ui fs-shape-${badgeShape}" data-badge-id="${matchingBadge.id}" style="
-              background-color: ${badgeShape === 'OUTLINE' ? 'transparent' : finalBg} !important;
-              color: ${badgeShape === 'OUTLINE' ? matchingBadge.bgColor : matchingBadge.textColor} !important;
-              border-color: ${matchingBadge.borderColor || matchingBadge.bgColor} !important;
-              padding: ${matchingBadge.paddingY || 4}px ${matchingBadge.paddingX || 10}px !important;
-              font-size: ${matchingBadge.fontSize || 12}px !important;
-              font-weight: ${matchingBadge.fontWeight || "bold"} !important;
-              border-radius: ${matchingBadge.borderRadius || 20}px !important;
-            ">
+            <span class="fs-pdp-badge" style="background-color: ${matchingBadge.bgColor}; color: ${matchingBadge.textColor}; border-radius: 999px;">
               ${iconHtml}
-              ${textHtml}
+              <span>${matchingBadge.text}</span>
             </span>
           `;
         }
-      } catch (err) { }
+      } catch (err) {
+        // Fallback to theme block default
+      }
     }
 
     fetchPDPLabel();
   })();
 </script>
+{% endif %}
 
 {% schema %}
 {
-  "name": "Product Badge Label",
+  "name": "Product Badge Label Pro",
   "target": "section",
   "settings": [
     {
-      "type": "header",
-      "content": "Fallback Styling"
-    },
-    {
       "type": "select",
       "id": "badge_shape",
-      "label": "Badge Shape",
-      "options": [
-        { "value": "PILL", "label": "Pill / Capsule" },
-        { "value": "SHARP", "label": "Sharp Square" },
-        { "value": "TAG", "label": "Price Tag" },
-        { "value": "STARBURST", "label": "Starburst" }
-      ],
-      "default": "PILL"
+      "label": "Shape",
+      "options": [{ "value": "pill", "label": "Pill" }, { "value": "rounded", "label": "Rounded" }, { "value": "sharp", "label": "Sharp" }],
+      "default": "pill"
     },
-    { "type": "color", "id": "bg_color", "label": "Background Color", "default": "#111111" },
+    { "type": "color", "id": "bg_color", "label": "Background", "default": "#111827" },
     { "type": "color", "id": "text_color", "label": "Text Color", "default": "#FFFFFF" },
-    { "type": "range", "id": "font_size", "min": 10, "max": 24, "step": 1, "unit": "px", "label": "Font Size", "default": 13 },
-    { "type": "range", "id": "padding_vertical", "min": 2, "max": 16, "step": 1, "unit": "px", "label": "Vertical Padding", "default": 6 },
-    { "type": "range", "id": "padding_horizontal", "min": 6, "max": 30, "step": 1, "unit": "px", "label": "Horizontal Padding", "default": 14 },
-    { "type": "text", "id": "preview_text", "label": "Default/Fallback Text", "default": "⚡ LIMITED STOCK" }
+    { "type": "range", "id": "font_size", "min": 10, "max": 20, "step": 1, "unit": "px", "label": "Font Size", "default": 12 },
+    { "type": "text", "id": "preview_text", "label": "Default Text", "default": "⚡ LIMITED STOCK" }
   ]
 }
 {% endschema %}
