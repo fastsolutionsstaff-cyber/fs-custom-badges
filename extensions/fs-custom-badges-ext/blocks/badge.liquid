@@ -1,8 +1,15 @@
+{%- comment -%}
+  Professional Storefront Product Grid Badges Engine (Home & Collection Grids Only)
+{%- endcomment -%}
+
+{%- unless request.page_type == 'product' -%}
 <script>
   (function () {
     "use strict";
 
-    // Correct Shopify App Proxy endpoint
+    // Double check to ensure it never runs on product pages via JS
+    if (window.location.pathname.includes('/products/')) return;
+
     const API_ENDPOINT = "/apps/badges";
     const SHOP_DOMAIN = "{{ shop.permanent_domain }}";
 
@@ -55,7 +62,6 @@
         ".grid__item .card",
         "li.grid__item",
         "[data-product-id]",
-        ".product__media-wrapper",
         ".card__inner"
       ];
 
@@ -157,7 +163,6 @@
 
       targetMedia.appendChild(badgeEl);
 
-      // Track Impression
       fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -171,14 +176,10 @@
 
       cards.forEach((card) => {
         const productData = getProductData(card);
-        const match = badgeConfiguration.path ? null : badgeConfiguration.find((badge) => isEligible(badge, productData));
+        const match = badgeConfiguration.find((badge) => isEligible(badge, productData));
 
         if (match) {
           renderBadge(card, match);
-        } else {
-          // fallback search
-          const foundMatch = badgeConfiguration.find((badge) => isEligible(badge, productData));
-          if (foundMatch) renderBadge(card, foundMatch);
         }
       });
     }
@@ -202,6 +203,7 @@
     }
   })();
 </script>
+{%- endunless -%}
 
 {% schema %}
 {
