@@ -12,11 +12,11 @@
   data-product-price="{{ current_product.price | divided_by: 100.0 }}"
   data-product-inventory="{% if current_product.selected_or_first_available_variant.inventory_management %}{{ current_product.selected_or_first_available_variant.inventory_quantity }}{% else %}999{% endif %}"
   style="
-    margin-top: {{ block.settings.margin_top }}px;
-    margin-bottom: {{ block.settings.margin_bottom }}px;
+    margin-top: {{ block.settings.margin_top | default: 8 }}px;
+    margin-bottom: {{ block.settings.margin_bottom | default: 12 }}px;
   "
 >
-  <span class="fs-badge-ui fs-shape-{{ block.settings.badge_shape | upcase }}" style="background-color: {{ block.settings.bg_color }}; color: {{ block.settings.text_color }}; padding: {{ block.settings.padding_vertical }}px {{ block.settings.padding_horizontal }}px; font-size: {{ block.settings.font_size }}px; letter-spacing: {{ block.settings.letter_spacing }}px; border-radius: {{ block.settings.border_radius }}px; --fs-px: {{ block.settings.padding_horizontal }}px; --fs-py: {{ block.settings.padding_vertical }}px;">
+  <span class="fs-badge-ui fs-shape-{{ block.settings.badge_shape | default: 'PILL' | upcase }}" style="background-color: {{ block.settings.bg_color | default: '#111111' }}; color: {{ block.settings.text_color | default: '#FFFFFF' }}; padding: {{ block.settings.padding_vertical | default: 6 }}px {{ block.settings.padding_horizontal | default: 14 }}px; font-size: {{ block.settings.font_size | default: 13 }}px; border-radius: {{ block.settings.border_radius | default: 20 }}px;">
     {% if block.settings.show_icon and block.settings.default_icon != blank %}
       <span class="fs-badge-icon-wrap">{{ block.settings.default_icon }}</span>
     {% endif %}
@@ -27,25 +27,25 @@
 
 <style>
   .fs-pdp-label-wrapper { display: flex; align-items: center; width: 100%; }
-  .fs-badge-ui { display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; line-height: 1.2 !important; box-sizing: border-box !important; text-transform: uppercase !important; white-space: nowrap !important; transition: all 0.3s ease !important; cursor: pointer; }
+  .fs-badge-ui { display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; line-height: 1.2 !important; box-sizing: border-box !important; text-transform: uppercase !important; white-space: nowrap !important; transition: all 0.3s ease !important; cursor: pointer; font-weight: 800; }
   .fs-shape-PILL { border-radius: 50px !important; }
   .fs-shape-SHARP { border-radius: 0px !important; }
   .fs-shape-OUTLINE { background-color: transparent !important; border: 2px solid currentColor !important; }
   .fs-shape-GLASSMORPHISM { backdrop-filter: blur(8px) !important; -webkit-backdrop-filter: blur(8px) !important; border: 1px solid rgba(255,255,255,0.4) !important; box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important; }
-  .fs-shape-TAG { border-radius: 0 6px 6px 0 !important; clip-path: polygon(15px 0, 100% 0, 100% 100%, 15px 100%, 0 50%) !important; padding-left: calc(var(--fs-px) + 12px) !important; position: relative !important; }
-  .fs-shape-BOOKMARK { border-radius: 6px 0 0 6px !important; clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 50%, 100% 100%, 0 100%) !important; padding-right: calc(var(--fs-px) + 12px) !important; }
-  .fs-shape-STARBURST { aspect-ratio: 1 !important; border-radius: 0 !important; clip-path: polygon(50% 0%, 61% 12%, 85% 12%, 85% 39%, 100% 50%, 85% 61%, 85% 88%, 61% 88%, 50% 100%, 39% 88%, 15% 88%, 15% 61%, 0% 50%, 15% 39%, 15% 12%, 39% 12%) !important; flex-direction: column !important; justify-content: center !important; text-align: center !important; white-space: normal !important; padding: calc(var(--fs-py) + 10px) !important; }
+  .fs-shape-TAG { border-radius: 0 6px 6px 0 !important; clip-path: polygon(15px 0, 100% 0, 100% 100%, 15px 100%, 0 50%) !important; padding-left: 18px !important; position: relative !important; }
+  .fs-shape-BOOKMARK { border-radius: 6px 0 0 6px !important; clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 50%, 100% 100%, 0 100%) !important; padding-right: 18px !important; }
+  .fs-shape-STARBURST { aspect-ratio: 1 !important; border-radius: 0 !important; clip-path: polygon(50% 0%, 61% 12%, 85% 12%, 85% 39%, 100% 50%, 85% 61%, 85% 88%, 61% 88%, 50% 100%, 39% 88%, 15% 88%, 15% 61%, 0% 50%, 15% 39%, 15% 12%, 39% 12%) !important; flex-direction: column !important; justify-content: center !important; text-align: center !important; white-space: normal !important; padding: 12px !important; }
   .fs-shape-DIAGONAL { transform: skewX(-15deg) !important; border-radius: 4px !important; }
   .fs-shape-DIAGONAL > * { transform: skewX(15deg) !important; }
-  .fs-shape-RIBBON { clip-path: polygon(0 0, 100% 0, 88% 50%, 100% 100%, 0 100%) !important; border-radius: 0 !important; padding-right: calc(var(--fs-px) + 12px) !important; }
+  .fs-shape-RIBBON { clip-path: polygon(0 0, 100% 0, 88% 50%, 100% 100%, 0 100%) !important; border-radius: 0 !important; padding-right: 18px !important; }
   .fs-badge-icon-wrap { display: inline-flex !important; align-items: center !important; }
 </style>
 
 <script>
   (function() {
     const wrapper = document.getElementById("fs-pdp-label-{{ block.id }}");
-    if (!wrapper || wrapper.dataset.loaded === "true") return;
-    wrapper.dataset.loaded = "true";
+    if (!wrapper || wrapper.dataset.rendered === "true") return;
+    wrapper.dataset.rendered = "true";
 
     const API_ENDPOINT = '/apps/badges'; 
     const FALLBACK_ENDPOINT = 'https://fs-custom-badges.vercel.app/api/badges';
@@ -64,24 +64,14 @@
 
     if (!productId) return;
 
-    function isDeviceEligible(badge) {
-      const isMobile = window.matchMedia("(max-width: 749px)").matches;
-      if (isMobile && badge.hideOnMobile === true) return false;
-      if (!isMobile && badge.hideOnDesktop === true) return false;
-      return true;
-    }
-
     function isEligible(badge) {
       if (badge.enabled === false) return false;
-      if (!isDeviceEligible(badge)) return false;
-
       const targetType = badge.targetType || (badge.isGlobal ? 'GLOBAL' : 'GLOBAL');
       if (targetType === 'GLOBAL') return true;
       if (targetType === 'SPECIFIC_PRODUCTS' && Array.isArray(badge.productIds)) return badge.productIds.some(id => normalizeProductId(id) === productId);
       if (targetType === 'PRODUCT_TAGS' && Array.isArray(badge.targetTags)) return tags.some(tag => badge.targetTags.map(t => String(t).trim().toLowerCase()).includes(tag));
       if (targetType === 'INVENTORY_LEVEL') return inventory >= Number(badge.minInventory ?? 0) && inventory <= Number(badge.maxInventory ?? 999999);
       if (targetType === 'PRICE_RANGE') return price >= Number(badge.minPrice ?? 0) && price <= Number(badge.maxPrice ?? 999999999);
-      
       return false;
     }
 
@@ -114,8 +104,6 @@
               font-size: ${matchingBadge.fontSize || 12}px !important;
               font-weight: ${matchingBadge.fontWeight || "bold"} !important;
               border-radius: ${matchingBadge.borderRadius || 20}px !important;
-              --fs-px: ${matchingBadge.paddingX || 10}px;
-              --fs-py: ${matchingBadge.paddingY || 4}px;
             ">
               ${iconHtml}
               ${textHtml}
@@ -136,7 +124,7 @@
   "settings": [
     {
       "type": "header",
-      "content": "Fallback Styling (If App Offline)"
+      "content": "Fallback Styling"
     },
     {
       "type": "select",

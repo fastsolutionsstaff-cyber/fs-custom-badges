@@ -35,7 +35,7 @@
   (function () {
     "use strict";
 
-    // 🛑 STRICT GUARD: Do not run grid badge engine on Product Detail Pages (PDP)
+    // 🛑 Hard stop if on a product page route
     if (window.location.pathname.includes('/products/')) {
       return; 
     }
@@ -76,7 +76,12 @@
       ];
       const cards = new Set();
       selectors.forEach((selector) => { 
-        document.querySelectorAll(selector).forEach((el) => cards.add(el)); 
+        document.querySelectorAll(selector).forEach((el) => {
+          // Ignore if card belongs to main product section of PDP
+          if (!el.closest('section[id*="main-product"], .product-section, .product-main, form[action*="/cart/add"]')) {
+            cards.add(el);
+          }
+        }); 
       });
       return Array.from(cards);
     }
