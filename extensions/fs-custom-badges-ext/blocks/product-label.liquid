@@ -1,7 +1,6 @@
 {%- comment -%}
   Product Label Block for Product Details Page (PDP)
 {%- endcomment -%}
-
 {% assign current_product = product %}
 
 {% if current_product %}
@@ -13,86 +12,35 @@
   data-product-price="{{ current_product.price | divided_by: 100.0 }}"
   data-product-inventory="{% if current_product.selected_or_first_available_variant.inventory_management %}{{ current_product.selected_or_first_available_variant.inventory_quantity }}{% else %}999{% endif %}"
   style="
-    --label-bg-color: {{ block.settings.bg_color }};
-    --label-text-color: {{ block.settings.text_color }};
-    --label-font-size: {{ block.settings.font_size }}px;
-    --label-border-radius: {{ block.settings.border_radius }}px;
-    --label-padding-v: {{ block.settings.padding_vertical }}px;
-    --label-padding-h: {{ block.settings.padding_horizontal }}px;
-    --label-margin-top: {{ block.settings.margin_top }}px;
-    --label-margin-bottom: {{ block.settings.margin_bottom }}px;
-    --label-letter-spacing: {{ block.settings.letter_spacing }}px;
+    margin-top: {{ block.settings.margin_top }}px;
+    margin-bottom: {{ block.settings.margin_bottom }}px;
   "
 >
-  <span class="fs-pdp-badge fs-shape-{{ block.settings.badge_shape | upcase }}">
+  <span class="fs-badge-ui fs-shape-{{ block.settings.badge_shape | upcase }}" style="background-color: {{ block.settings.bg_color }}; color: {{ block.settings.text_color }}; padding: {{ block.settings.padding_vertical }}px {{ block.settings.padding_horizontal }}px; font-size: {{ block.settings.font_size }}px; letter-spacing: {{ block.settings.letter_spacing }}px; border-radius: {{ block.settings.border_radius }}px; --fs-px: {{ block.settings.padding_horizontal }}px; --fs-py: {{ block.settings.padding_vertical }}px;">
     {% if block.settings.show_icon and block.settings.default_icon != blank %}
-      <span class="fs-badge-icon">{{ block.settings.default_icon }}</span>
+      <span class="fs-badge-icon-wrap">{{ block.settings.default_icon }}</span>
     {% endif %}
-    <span class="fs-badge-text">{{ block.settings.preview_text | default: "⚡ LIMITED STOCK" }}</span>
+    <span>{{ block.settings.preview_text | default: "⚡ LIMITED STOCK" }}</span>
   </span>
 </div>
 
 <style>
-  .fs-pdp-label-wrapper {
-    display: flex;
-    align-items: center;
-    margin-top: var(--label-margin-top);
-    margin-bottom: var(--label-margin-bottom);
-    width: 100%;
-  }
-
-  .fs-pdp-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background-color: var(--label-bg-color);
-    color: var(--label-text-color);
-    font-size: var(--label-font-size);
-    font-weight: 800;
-    padding: var(--label-padding-v) var(--label-padding-h);
-    letter-spacing: var(--label-letter-spacing);
-    text-transform: uppercase;
-    line-height: 1.2;
-    transition: all 0.3s ease;
-    cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-  }
-
-  /* Synced PDP Shapes */
-  .fs-pdp-badge.fs-shape-PILL { border-radius: 50px; }
-  .fs-pdp-badge.fs-shape-ROUNDED { border-radius: 6px; }
-  .fs-pdp-badge.fs-shape-SHARP { border-radius: 0px; }
+  .fs-pdp-label-wrapper { display: flex; align-items: center; width: 100%; }
   
-  .fs-pdp-badge.fs-shape-OUTLINE {
-    background-color: transparent !important;
-    border: 2px solid var(--label-bg-color);
-    color: var(--label-bg-color) !important;
-  }
-
-  .fs-pdp-badge.fs-shape-GLASSMORPHISM {
-    background-color: transparent !important;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  }
-
-  .fs-pdp-badge.fs-shape-RIBBON {
-    clip-path: polygon(0 0, 100% 0, 92% 50%, 100% 100%, 0 100%);
-    padding-right: calc(var(--label-padding-h) + 12px) !important;
-    border-radius: 0;
-  }
-
-  .fs-pdp-badge.fs-shape-FLOATING_GLOW {
-    border-radius: 50px;
-    animation: fs-pdp-glow 2s infinite alternate;
-  }
-
-  @keyframes fs-pdp-glow {
-    0% { transform: scale(1); filter: brightness(1); }
-    100% { transform: scale(1.02); filter: brightness(1.1); box-shadow: 0 0 15px var(--label-bg-color); }
-  }
-
-  .fs-badge-icon { display: inline-flex; align-items: center; font-size: 1.1em; }
+  /* Fallback CSS if grid block is missing */
+  .fs-badge-ui { display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; line-height: 1.2 !important; box-sizing: border-box !important; text-transform: uppercase !important; white-space: nowrap !important; transition: all 0.3s ease !important; cursor: pointer; }
+  .fs-shape-PILL { border-radius: 50px !important; }
+  .fs-shape-SHARP { border-radius: 0px !important; }
+  .fs-shape-OUTLINE { background-color: transparent !important; border: 2px solid currentColor !important; }
+  .fs-shape-GLASSMORPHISM { backdrop-filter: blur(8px) !important; -webkit-backdrop-filter: blur(8px) !important; border: 1px solid rgba(255,255,255,0.4) !important; box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important; }
+  .fs-shape-TAG { border-radius: 0 6px 6px 0 !important; clip-path: polygon(15px 0, 100% 0, 100% 100%, 15px 100%, 0 50%) !important; padding-left: calc(var(--fs-px) + 12px) !important; position: relative !important; }
+  .fs-shape-TAG::before { content: '' !important; position: absolute !important; left: 5px !important; top: 50% !important; transform: translateY(-50%) !important; width: 6px !important; height: 6px !important; background-color: rgba(255,255,255,0.8) !important; border-radius: 50% !important; }
+  .fs-shape-BOOKMARK { border-radius: 6px 0 0 6px !important; clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 50%, 100% 100%, 0 100%) !important; padding-right: calc(var(--fs-px) + 12px) !important; }
+  .fs-shape-STARBURST { aspect-ratio: 1 !important; border-radius: 0 !important; clip-path: polygon(50% 0%, 61% 12%, 85% 12%, 85% 39%, 100% 50%, 85% 61%, 85% 88%, 61% 88%, 50% 100%, 39% 88%, 15% 88%, 15% 61%, 0% 50%, 15% 39%, 15% 12%, 39% 12%) !important; flex-direction: column !important; justify-content: center !important; text-align: center !important; white-space: normal !important; padding: calc(var(--fs-py) + 10px) !important; }
+  .fs-shape-DIAGONAL { transform: skewX(-15deg) !important; border-radius: 4px !important; }
+  .fs-shape-DIAGONAL > * { transform: skewX(15deg) !important; }
+  .fs-shape-RIBBON { clip-path: polygon(0 0, 100% 0, 88% 50%, 100% 100%, 0 100%) !important; border-radius: 0 !important; padding-right: calc(var(--fs-px) + 12px) !important; }
+  .fs-badge-icon-wrap { display: inline-flex !important; align-items: center !important; }
 </style>
 
 <script>
@@ -100,7 +48,7 @@
     const wrapper = document.getElementById("fs-pdp-label-{{ block.id }}");
     if (!wrapper) return;
 
-    const API_ENDPOINT = '/apps/proxy/api/badges'; // Matched with grid setup
+    const API_ENDPOINT = '/apps/proxy/api/badges'; 
     const FALLBACK_ENDPOINT = '/api/badges';
     const shop = "{{ shop.permanent_domain }}";
 
@@ -140,9 +88,9 @@
 
     async function fetchPDPLabel() {
       try {
-        let response = await fetch(`${FALLBACK_ENDPOINT}?shop=${encodeURIComponent(shop)}`);
-        if (!response.ok) response = await fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(shop)}`);
-        
+        const timestamp = new Date().getTime(); // Fresh data every time
+        let response = await fetch(`${FALLBACK_ENDPOINT}?shop=${encodeURIComponent(shop)}&t=${timestamp}`, { headers: { "Cache-Control": "no-cache" } });
+        if (!response.ok) response = await fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(shop)}&t=${timestamp}`, { headers: { "Cache-Control": "no-cache" } });
         if (!response.ok) return;
 
         const data = await response.json();
@@ -151,35 +99,39 @@
         const matchingBadge = data.badges.find(badge => isEligible(badge));
 
         if (matchingBadge) {
-          const iconHtml = matchingBadge.icon ? `<span class="fs-badge-icon">${matchingBadge.icon}</span>` : "";
-          const badgeShape = (matchingBadge.shape || "{{ block.settings.badge_shape }}").toUpperCase();
+          const badgeShape = (matchingBadge.shape || "PILL").toUpperCase();
+          let finalBg = matchingBadge.bgColor;
+          if (badgeShape === "GLASSMORPHISM") finalBg += "99";
 
-          if (matchingBadge.bgColor) wrapper.style.setProperty('--label-bg-color', matchingBadge.bgColor);
-          if (matchingBadge.textColor) wrapper.style.setProperty('--label-text-color', matchingBadge.textColor);
-          
-          if (badgeShape === "GLASSMORPHISM") {
-             wrapper.style.setProperty('--label-bg-color', matchingBadge.bgColor + "99");
-          }
+          const iconHtml = matchingBadge.icon ? `<span class="fs-badge-icon-wrap">${matchingBadge.icon}</span>` : "";
+          const textHtml = badgeShape === "DIAGONAL" ? `<span><span>${matchingBadge.text}</span></span>` : `<span>${matchingBadge.text}</span>`;
 
           wrapper.innerHTML = `
-            <span class="fs-pdp-badge fs-shape-${badgeShape}" data-badge-id="${matchingBadge.id}">
+            <span class="fs-badge-ui fs-shape-${badgeShape}" data-badge-id="${matchingBadge.id}" style="
+              background-color: ${badgeShape === 'OUTLINE' ? 'transparent' : finalBg} !important;
+              color: ${badgeShape === 'OUTLINE' ? matchingBadge.bgColor : matchingBadge.textColor} !important;
+              border-color: ${matchingBadge.borderColor || matchingBadge.bgColor} !important;
+              padding: ${matchingBadge.paddingY || 4}px ${matchingBadge.paddingX || 10}px !important;
+              font-size: ${matchingBadge.fontSize || 12}px !important;
+              font-weight: ${matchingBadge.fontWeight || "bold"} !important;
+              border-radius: ${matchingBadge.borderRadius || 20}px !important;
+              --fs-px: ${matchingBadge.paddingX || 10}px;
+              --fs-py: ${matchingBadge.paddingY || 4}px;
+            ">
               ${iconHtml}
-              <span class="fs-badge-text">${matchingBadge.text}</span>
+              ${textHtml}
             </span>
           `;
 
-          const badgeEl = wrapper.querySelector('.fs-pdp-badge');
-          
+          const badgeEl = wrapper.querySelector('.fs-badge-ui');
           badgeEl.addEventListener('click', () => {
             fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(shop)}`, {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ badgeId: matchingBadge.id, eventType: 'CLICK', productId }),
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ badgeId: matchingBadge.id, eventType: 'CLICK', productId }),
             }).catch(() => {});
           });
 
           fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(shop)}`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ badgeId: matchingBadge.id, eventType: 'IMPRESSION', productId }),
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ badgeId: matchingBadge.id, eventType: 'IMPRESSION', productId }),
           }).catch(() => {});
         }
       } catch (err) { }
@@ -188,7 +140,6 @@
     fetchPDPLabel();
   })();
 </script>
-{% endif %}
 
 {% schema %}
 {
@@ -197,106 +148,26 @@
   "settings": [
     {
       "type": "header",
-      "content": "🎨 Label Styling"
+      "content": "Fallback Styling (If App Offline)"
     },
     {
       "type": "select",
       "id": "badge_shape",
       "label": "Badge Shape",
       "options": [
-        { "value": "rounded", "label": "Rounded Corners" },
-        { "value": "pill", "label": "Pill / Capsule" },
-        { "value": "sharp", "label": "Sharp Square" },
-        { "value": "outline", "label": "Modern Outline" }
+        { "value": "PILL", "label": "Pill / Capsule" },
+        { "value": "SHARP", "label": "Sharp Square" },
+        { "value": "TAG", "label": "Price Tag" },
+        { "value": "STARBURST", "label": "Starburst" }
       ],
-      "default": "rounded"
+      "default": "PILL"
     },
-    {
-      "type": "color",
-      "id": "bg_color",
-      "label": "Background Color",
-      "default": "#111111"
-    },
-    {
-      "type": "color",
-      "id": "text_color",
-      "label": "Text Color",
-      "default": "#FFFFFF"
-    },
-    {
-      "type": "range",
-      "id": "font_size",
-      "min": 10,
-      "max": 24,
-      "step": 1,
-      "unit": "px",
-      "label": "Font Size",
-      "default": 13
-    },
-    {
-      "type": "range",
-      "id": "letter_spacing",
-      "min": 0,
-      "max": 3,
-      "step": 0.5,
-      "unit": "px",
-      "label": "Letter Spacing",
-      "default": 1
-    },
-    {
-      "type": "header",
-      "content": "📐 Spacing & Padding"
-    },
-    {
-      "type": "range",
-      "id": "padding_vertical",
-      "min": 2,
-      "max": 16,
-      "step": 1,
-      "unit": "px",
-      "label": "Vertical Padding",
-      "default": 6
-    },
-    {
-      "type": "range",
-      "id": "padding_horizontal",
-      "min": 6,
-      "max": 30,
-      "step": 1,
-      "unit": "px",
-      "label": "Horizontal Padding",
-      "default": 14
-    },
-    {
-      "type": "range",
-      "id": "margin_top",
-      "min": 0,
-      "max": 40,
-      "step": 2,
-      "unit": "px",
-      "label": "Top Margin",
-      "default": 8
-    },
-    {
-      "type": "range",
-      "id": "margin_bottom",
-      "min": 0,
-      "max": 40,
-      "step": 2,
-      "unit": "px",
-      "label": "Bottom Margin",
-      "default": 12
-    },
-    {
-      "type": "header",
-      "content": "👁️ Badge Preview Text"
-    },
-    {
-      "type": "text",
-      "id": "preview_text",
-      "label": "Default/Fallback Text",
-      "default": "⚡ LIMITED STOCK"
-    }
+    { "type": "color", "id": "bg_color", "label": "Background Color", "default": "#111111" },
+    { "type": "color", "id": "text_color", "label": "Text Color", "default": "#FFFFFF" },
+    { "type": "range", "id": "font_size", "min": 10, "max": 24, "step": 1, "unit": "px", "label": "Font Size", "default": 13 },
+    { "type": "range", "id": "padding_vertical", "min": 2, "max": 16, "step": 1, "unit": "px", "label": "Vertical Padding", "default": 6 },
+    { "type": "range", "id": "padding_horizontal", "min": 6, "max": 30, "step": 1, "unit": "px", "label": "Horizontal Padding", "default": 14 },
+    { "type": "text", "id": "preview_text", "label": "Default/Fallback Text", "default": "⚡ LIMITED STOCK" }
   ]
 }
 {% endschema %}

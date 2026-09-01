@@ -1,21 +1,42 @@
 import { useMemo, useState } from "react";
 import { json } from "@remix-run/node";
-import {
-  useActionData,
-  useLoaderData,
-  useNavigation,
-  useSubmit,
-} from "@remix-run/react";
-
-import {
-  Page, Card, Tabs, TextField, Select, Checkbox, Button, BlockStack,
-  InlineStack, Text, Box, Banner, Divider, Badge as PolarisBadge,
-  RangeSlider, Grid, IndexTable, Modal, EmptyState, Tooltip,
-} from "@shopify/polaris";
+import { useActionData, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
+import { Page, Card, Tabs, TextField, Select, Checkbox, Button, BlockStack, InlineStack, Text, Box, Banner, Divider, Badge as PolarisBadge, RangeSlider, Grid, IndexTable, Modal, EmptyState, Tooltip } from "@shopify/polaris";
 import { PlusIcon, EditIcon, DeleteIcon, DuplicateIcon } from "@shopify/polaris-icons";
-
 import { authenticate } from "../shopify.server.js";
 import db from "../db.server.js";
+
+/* =========================================================
+   UNIVERSAL CSS ENGINE (Shared between Dashboard & Liquid)
+========================================================= */
+const SHARED_CSS = `
+  .fs-badge-ui {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    line-height: 1.2 !important;
+    box-sizing: border-box !important;
+    text-transform: uppercase !important;
+    white-space: nowrap !important;
+    transition: all 0.3s ease !important;
+    border: 1px solid transparent;
+  }
+  .fs-shape-PILL { border-radius: 50px !important; }
+  .fs-shape-SHARP { border-radius: 0px !important; }
+  .fs-shape-OUTLINE { background-color: transparent !important; border-width: 2px !important; border-style: solid !important; }
+  .fs-shape-GLASSMORPHISM { backdrop-filter: blur(8px) !important; -webkit-backdrop-filter: blur(8px) !important; border-color: rgba(255,255,255,0.4) !important; box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important; }
+  .fs-shape-FLOATING_GLOW { border-radius: 50px !important; border: none !important; box-shadow: 0 0 15px var(--fs-glow-color) !important; animation: fs-pulse 2s infinite alternate !important; }
+  .fs-shape-TAG { border-radius: 0 6px 6px 0 !important; clip-path: polygon(15px 0, 100% 0, 100% 100%, 15px 100%, 0 50%) !important; padding-left: calc(var(--fs-px) + 12px) !important; position: relative !important; }
+  .fs-shape-TAG::before { content: '' !important; position: absolute !important; left: 5px !important; top: 50% !important; transform: translateY(-50%) !important; width: 6px !important; height: 6px !important; background-color: rgba(255,255,255,0.8) !important; border-radius: 50% !important; }
+  .fs-shape-BOOKMARK { border-radius: 6px 0 0 6px !important; clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 50%, 100% 100%, 0 100%) !important; padding-right: calc(var(--fs-px) + 12px) !important; }
+  .fs-shape-STARBURST { aspect-ratio: 1 !important; border-radius: 0 !important; clip-path: polygon(50% 0%, 61% 12%, 85% 12%, 85% 39%, 100% 50%, 85% 61%, 85% 88%, 61% 88%, 50% 100%, 39% 88%, 15% 88%, 15% 61%, 0% 50%, 15% 39%, 15% 12%, 39% 12%) !important; flex-direction: column !important; justify-content: center !important; text-align: center !important; white-space: normal !important; padding: calc(var(--fs-py) + 10px) !important; }
+  .fs-shape-DIAGONAL { transform: skewX(-15deg) !important; border-radius: 4px !important; }
+  .fs-shape-DIAGONAL > * { transform: skewX(15deg) !important; }
+  .fs-shape-RIBBON { clip-path: polygon(0 0, 100% 0, 88% 50%, 100% 100%, 0 100%) !important; border-radius: 0 !important; padding-right: calc(var(--fs-px) + 12px) !important; }
+  .fs-badge-icon-wrap { display: inline-flex !important; align-items: center !important; }
+  @keyframes fs-pulse { 0% { transform: scale(1); } 100% { transform: scale(1.05); } }
+`;
 
 /* =========================================================
    HELPERS & PRESETS
@@ -31,12 +52,11 @@ const DEFAULT_FORM = {
 };
 
 const PRESETS = {
-  BLACK_FRIDAY: { text: "BLACK FRIDAY", icon: "🏷️", bgColor: "#000000", textColor: "#FFFFFF", borderColor: "#000000", shape: "RIBBON" },
-  URGENCY: { text: "SELLING FAST", icon: "🔥", bgColor: "#FF3B30", textColor: "#FFFFFF", borderColor: "#FF3B30", shape: "FLOATING_GLOW" },
-  MINIMAL: { text: "PREMIUM", icon: "✦", bgColor: "#FFFFFF", textColor: "#111827", borderColor: "#111827", shape: "OUTLINE" },
-  ECO: { text: "100% ORGANIC", icon: "🌿", bgColor: "#34C759", textColor: "#FFFFFF", borderColor: "#34C759", shape: "GLASSMORPHISM" },
-  HOT_SALE: { text: "HOT SALE", icon: "⚡", bgColor: "#FF9500", textColor: "#FFFFFF", borderColor: "#FF9500", shape: "SHARP" },
-  BEST_SELLER: { text: "BEST SELLER", icon: "⭐", bgColor: "#007AFF", textColor: "#FFFFFF", borderColor: "#007AFF", shape: "PILL" },
+  TAG_SALE: { text: "SALE", icon: "🏷️", bgColor: "#E11D48", textColor: "#FFFFFF", borderColor: "#E11D48", shape: "TAG" },
+  STAR_NEW: { text: "NEW", icon: "✨", bgColor: "#F59E0B", textColor: "#111827", borderColor: "#F59E0B", shape: "STARBURST" },
+  BOOKMARK_FREE: { text: "FREE DELIVERY", icon: "🚚", bgColor: "#059669", textColor: "#FFFFFF", borderColor: "#059669", shape: "BOOKMARK" },
+  DIAGONAL_ORG: { text: "ORGANIC", icon: "🌿", bgColor: "#16A34A", textColor: "#FFFFFF", borderColor: "#16A34A", shape: "DIAGONAL" },
+  GLASS_TREND: { text: "TRENDING", icon: "🔥", bgColor: "#3B82F6", textColor: "#FFFFFF", borderColor: "#3B82F6", shape: "GLASSMORPHISM" },
 };
 
 function toDateInputValue(value) {
@@ -60,7 +80,7 @@ function badgeToForm(badge) {
 }
 
 /* =========================================================
-   LOADER & ACTIONS (Kept exactly same as your backend logic)
+   LOADER & ACTIONS
 ========================================================= */
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
@@ -251,66 +271,11 @@ export default function SaaSAdminApp() {
     if (selected) updateForm("productIds", selected.map((p) => p.id));
   };
 
-  /* Premium Live Preview Logic */
-  const getPreviewStyles = (shape, bg, text, border, radius, padY, padX) => {
-    let base = {
-      display: "inline-flex", alignItems: "center", gap: "6px",
-      fontSize: `${formData.fontSize}px`, fontWeight: formData.fontWeight,
-      textTransform: "uppercase", letterSpacing: "0.5px", zIndex: 10,
-      transition: "all 0.3s ease",
-    };
-
-    if (shape === "PILL" || shape === "SHARP") {
-      return {
-        ...base, background: bg, color: text, border: `1px solid ${border}`,
-        borderRadius: shape === "PILL" ? "50px" : "0px",
-        padding: `${padY}px ${padX}px`, boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-      };
-    }
-    if (shape === "OUTLINE") {
-      return {
-        ...base, background: "transparent", color: bg, border: `2px solid ${bg}`,
-        borderRadius: `${radius}px`, padding: `${padY}px ${padX}px`,
-      };
-    }
-    if (shape === "GLASSMORPHISM") {
-      return {
-        ...base, background: `${bg}99`, color: text,
-        backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
-        border: `1px solid rgba(255,255,255,0.2)`, borderRadius: `${radius}px`,
-        padding: `${padY}px ${padX}px`, boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
-      };
-    }
-    if (shape === "RIBBON") {
-      return {
-        ...base, background: bg, color: text, border: "none",
-        padding: `${padY}px ${padX + 10}px ${padY}px ${padX}px`,
-        borderRadius: "0px", position: "relative",
-        clipPath: "polygon(0 0, 100% 0, 85% 50%, 100% 100%, 0 100%)",
-        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-      };
-    }
-    if (shape === "FLOATING_GLOW") {
-      return {
-        ...base, background: bg, color: text, borderRadius: "50px", border: "none",
-        padding: `${padY}px ${padX}px`, boxShadow: `0 0 15px 2px ${bg}80`,
-      };
-    }
-    return base;
-  };
-
-  const previewBadgeStyle = getPreviewStyles(
-    formData.shape, formData.bgColor, formData.textColor, formData.borderColor,
-    formData.borderRadius, formData.paddingY, formData.paddingX
-  );
   const safePosition = formData.position || "TOP_LEFT";
 
   return (
-    <Page
-      title="Badge Studio"
-      subtitle="Create, control and optimize storefront product badges."
-      primaryAction={{ content: "Create badge", icon: PlusIcon, onAction: () => handleOpenModal() }}
-    >
+    <Page title="Badge Studio" subtitle="Create, control and optimize storefront product badges." primaryAction={{ content: "Create badge", icon: PlusIcon, onAction: () => handleOpenModal() }}>
+      <style>{SHARED_CSS}</style>
       <BlockStack gap="500">
         {actionData?.message && (
           <Banner tone={actionData.success === false ? "critical" : "success"}>
@@ -319,26 +284,10 @@ export default function SaaSAdminApp() {
         )}
 
         <Grid>
-          <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-            <Card padding="400">
-              <BlockStack gap="200"><Text variant="bodySm" tone="subdued">Active badges</Text><Text variant="headingXl">{activeBadges.length}</Text><PolarisBadge tone="success">Storefront ready</PolarisBadge></BlockStack>
-            </Card>
-          </Grid.Cell>
-          <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-            <Card padding="400">
-              <BlockStack gap="200"><Text variant="bodySm" tone="subdued">Total campaigns</Text><Text variant="headingXl">{badges.length}</Text><Text variant="bodySm" tone="subdued">{disabledBadges.length} disabled</Text></BlockStack>
-            </Card>
-          </Grid.Cell>
-          <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-            <Card padding="400">
-              <BlockStack gap="200"><Text variant="bodySm" tone="subdued">Impressions</Text><Text variant="headingXl">{Number(analytics.totalImpressions || 0).toLocaleString()}</Text><PolarisBadge tone="info">Storefront analytics</PolarisBadge></BlockStack>
-            </Card>
-          </Grid.Cell>
-          <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-            <Card padding="400">
-              <BlockStack gap="200"><Text variant="bodySm" tone="subdued">Average CTR</Text><Text variant="headingXl">{analytics.avgCtr || "0.00"}%</Text><PolarisBadge tone="attention">{Number(analytics.totalClicks || 0).toLocaleString()} clicks</PolarisBadge></BlockStack>
-            </Card>
-          </Grid.Cell>
+          <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}><Card padding="400"><BlockStack gap="200"><Text variant="bodySm" tone="subdued">Active badges</Text><Text variant="headingXl">{activeBadges.length}</Text><PolarisBadge tone="success">Storefront ready</PolarisBadge></BlockStack></Card></Grid.Cell>
+          <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}><Card padding="400"><BlockStack gap="200"><Text variant="bodySm" tone="subdued">Total campaigns</Text><Text variant="headingXl">{badges.length}</Text><Text variant="bodySm" tone="subdued">{disabledBadges.length} disabled</Text></BlockStack></Card></Grid.Cell>
+          <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}><Card padding="400"><BlockStack gap="200"><Text variant="bodySm" tone="subdued">Impressions</Text><Text variant="headingXl">{Number(analytics.totalImpressions || 0).toLocaleString()}</Text><PolarisBadge tone="info">Storefront analytics</PolarisBadge></BlockStack></Card></Grid.Cell>
+          <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}><Card padding="400"><BlockStack gap="200"><Text variant="bodySm" tone="subdued">Average CTR</Text><Text variant="headingXl">{analytics.avgCtr || "0.00"}%</Text><PolarisBadge tone="attention">{Number(analytics.totalClicks || 0).toLocaleString()} clicks</PolarisBadge></BlockStack></Card></Grid.Cell>
         </Grid>
 
         <Card padding="0">
@@ -346,10 +295,7 @@ export default function SaaSAdminApp() {
           <Box padding="500">
             {selectedTab === 0 && (
               <BlockStack gap="400">
-                <InlineStack align="space-between" blockAlign="center">
-                  <BlockStack gap="100"><Text variant="headingMd">Badge campaigns</Text><Text variant="bodySm" tone="subdued">Manage every badge displayed.</Text></BlockStack>
-                  <Button variant="primary" icon={PlusIcon} onClick={() => handleOpenModal()}>Create badge</Button>
-                </InlineStack>
+                <InlineStack align="space-between" blockAlign="center"><BlockStack gap="100"><Text variant="headingMd">Badge campaigns</Text><Text variant="bodySm" tone="subdued">Manage every badge displayed.</Text></BlockStack><Button variant="primary" icon={PlusIcon} onClick={() => handleOpenModal()}>Create badge</Button></InlineStack>
                 <Divider />
                 {badges.length === 0 ? (
                   <EmptyState heading="Create your first badge" action={{ content: "Create badge", onAction: () => handleOpenModal() }} image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"><p>Create a product badge and publish it.</p></EmptyState>
@@ -360,10 +306,15 @@ export default function SaaSAdminApp() {
                       return (
                         <IndexTable.Row id={badge.id} key={badge.id} position={index}>
                           <IndexTable.Cell>
-                             <div style={getPreviewStyles(badge.shape, badge.bgColor, badge.textColor, badge.borderColor, badge.borderRadius, 4, 10)}>
-                               {badge.icon && <span>{badge.icon}</span>}
-                               <span>{badge.text}</span>
-                             </div>
+                            <div className={`fs-badge-ui fs-shape-${badge.shape}`} style={{
+                                backgroundColor: badge.shape === 'GLASSMORPHISM' ? badge.bgColor + "CC" : badge.bgColor,
+                                color: badge.textColor, borderColor: badge.borderColor,
+                                padding: `${badge.paddingY}px ${badge.paddingX}px`, fontSize: `${Math.min(badge.fontSize, 12)}px`,
+                                borderRadius: `${badge.borderRadius}px`, '--fs-px': `${badge.paddingX}px`, '--fs-py': `${badge.paddingY}px`
+                            }}>
+                              {badge.icon && <span className="fs-badge-icon-wrap">{badge.icon}</span>}
+                              <span>{badge.text}</span>
+                            </div>
                           </IndexTable.Cell>
                           <IndexTable.Cell><BlockStack gap="100"><Text variant="bodyMd" fontWeight="bold">{badge.name}</Text><Text variant="bodySm" tone="subdued">{badge.targetType}</Text></BlockStack></IndexTable.Cell>
                           <IndexTable.Cell><InlineStack gap="200"><PolarisBadge tone={badge.enabled ? "success" : "subdued"}>{badge.enabled ? "Live" : "Disabled"}</PolarisBadge><Button size="micro" onClick={() => handleToggleBadge(badge)}>{badge.enabled ? "Disable" : "Enable"}</Button></InlineStack></IndexTable.Cell>
@@ -378,8 +329,6 @@ export default function SaaSAdminApp() {
                 )}
               </BlockStack>
             )}
-            
-            {/* Keeping Analytics and Settings exactly same but ensuring functionality */}
             {selectedTab === 1 && (
               <BlockStack gap="500">
                 <Text variant="headingLg">Conversion insights</Text>
@@ -391,7 +340,6 @@ export default function SaaSAdminApp() {
                 </Grid>
               </BlockStack>
             )}
-
             {selectedTab === 2 && (
               <BlockStack gap="500">
                 <Text variant="headingLg">Store settings</Text>
@@ -414,24 +362,20 @@ export default function SaaSAdminApp() {
               <Grid.Cell columnSpan={{ xs: 12, sm: 7, md: 7, lg: 7, xl: 7 }}>
                 <BlockStack gap="500">
                   <Card padding="400">
-                    <InlineStack align="space-between" blockAlign="center">
-                      <BlockStack gap="100"><Text variant="headingMd">Campaign status</Text></BlockStack>
-                      <Checkbox label={formData.enabled ? "Enabled" : "Disabled"} checked={formData.enabled} onChange={(v) => updateForm("enabled", v)} />
-                    </InlineStack>
+                    <InlineStack align="space-between" blockAlign="center"><BlockStack gap="100"><Text variant="headingMd">Campaign status</Text></BlockStack><Checkbox label={formData.enabled ? "Enabled" : "Disabled"} checked={formData.enabled} onChange={(v) => updateForm("enabled", v)} /></InlineStack>
                   </Card>
-
                   <Card padding="400">
                     <BlockStack gap="300">
-                      <Text variant="headingMd">Quick styles</Text>
+                      <Text variant="headingMd">Premium Styles Collection</Text>
                       <InlineStack gap="200" wrap>
-                        <Button onClick={() => handleApplyPreset("BLACK_FRIDAY")}>Black Friday (Ribbon)</Button>
-                        <Button onClick={() => handleApplyPreset("URGENCY")}>Urgency (Glow)</Button>
-                        <Button onClick={() => handleApplyPreset("MINIMAL")}>Minimal</Button>
-                        <Button onClick={() => handleApplyPreset("ECO")}>Eco (Glass)</Button>
+                        <Button onClick={() => handleApplyPreset("TAG_SALE")}>Sale Tag</Button>
+                        <Button onClick={() => handleApplyPreset("STAR_NEW")}>Starburst</Button>
+                        <Button onClick={() => handleApplyPreset("BOOKMARK_FREE")}>Bookmark</Button>
+                        <Button onClick={() => handleApplyPreset("DIAGONAL_ORG")}>Diagonal Ribbon</Button>
+                        <Button onClick={() => handleApplyPreset("GLASS_TREND")}>Glassmorphism</Button>
                       </InlineStack>
                     </BlockStack>
                   </Card>
-
                   <Card padding="400">
                     <BlockStack gap="400">
                       <Text variant="headingMd">Badge content</Text>
@@ -442,7 +386,6 @@ export default function SaaSAdminApp() {
                       </Grid>
                     </BlockStack>
                   </Card>
-
                   <Card padding="400">
                     <BlockStack gap="400">
                       <Text variant="headingMd">Appearance</Text>
@@ -453,33 +396,38 @@ export default function SaaSAdminApp() {
                       </Grid>
                       <Grid>
                         <Grid.Cell columnSpan={{ xs: 6 }}>
-                          <Select label="Shape" options={[{ label: "Pill", value: "PILL" }, { label: "Sharp", value: "SHARP" }, { label: "Outline", value: "OUTLINE" }, { label: "Glassmorphism", value: "GLASSMORPHISM" }, { label: "Ribbon", value: "RIBBON" }, { label: "Floating glow", value: "FLOATING_GLOW" }]} value={formData.shape} onChange={(v) => updateForm("shape", v)} />
+                          <Select label="Shape" options={[
+                            { label: "Round Pill", value: "PILL" }, { label: "Sharp Rectangle", value: "SHARP" }, 
+                            { label: "Price Tag", value: "TAG" }, { label: "Bookmark / Flag", value: "BOOKMARK" },
+                            { label: "Starburst / Sticker", value: "STARBURST" }, { label: "Diagonal Ribbon", value: "DIAGONAL" },
+                            { label: "Modern Outline", value: "OUTLINE" }, { label: "Side Ribbon", value: "RIBBON" }, 
+                            { label: "Frosted Glass", value: "GLASSMORPHISM" }, { label: "Neon Glow", value: "FLOATING_GLOW" }
+                          ]} value={formData.shape} onChange={(v) => updateForm("shape", v)} />
                         </Grid.Cell>
                         <Grid.Cell columnSpan={{ xs: 6 }}>
                           <Select label="Position" options={[{ label: "Top left", value: "TOP_LEFT" }, { label: "Top right", value: "TOP_RIGHT" }, { label: "Bottom left", value: "BOTTOM_LEFT" }, { label: "Bottom right", value: "BOTTOM_RIGHT" }, { label: "Center overlay", value: "CENTER_OVERLAY" }]} value={formData.position} onChange={(v) => updateForm("position", v)} />
                         </Grid.Cell>
                       </Grid>
                       <RangeSlider label={`Font size: ${formData.fontSize}px`} value={formData.fontSize} min={8} max={24} onChange={(v) => updateForm("fontSize", v)} output />
-                      <Select label="Font weight" options={[{ label: "Regular", value: "400" }, { label: "Medium", value: "500" }, { label: "Bold", value: "bold" }]} value={formData.fontWeight} onChange={(v) => updateForm("fontWeight", v)} />
+                      <Select label="Font weight" options={[{ label: "Regular", value: "400" }, { label: "Medium", value: "500" }, { label: "Bold", value: "bold" }, { label: "Extra Bold", value: "800" }]} value={formData.fontWeight} onChange={(v) => updateForm("fontWeight", v)} />
+                      <RangeSlider label={`Horizontal padding: ${formData.paddingX}px`} value={formData.paddingX} min={4} max={30} step={1} onChange={(v) => updateForm("paddingX", v)} output />
+                      <RangeSlider label={`Vertical padding: ${formData.paddingY}px`} value={formData.paddingY} min={2} max={20} step={1} onChange={(v) => updateForm("paddingY", v)} output />
+                      <RangeSlider label={`Border radius: ${formData.borderRadius}px`} value={formData.borderRadius} min={0} max={50} step={1} onChange={(v) => updateForm("borderRadius", v)} output />
                     </BlockStack>
                   </Card>
-                  
-                  {/* Kept targeting exactly same as original logic */}
                   <Card padding="400">
                     <BlockStack gap="400">
                       <Text variant="headingMd">Targeting</Text>
                       <Select label="Display condition" options={[{ label: "All products", value: "GLOBAL" }, { label: "Specific products", value: "SPECIFIC_PRODUCTS" }, { label: "Product tags", value: "PRODUCT_TAGS" }, { label: "Inventory level", value: "INVENTORY_LEVEL" }, { label: "Price range", value: "PRICE_RANGE" }]} value={formData.targetType} onChange={(v) => updateForm("targetType", v)} />
                       {formData.targetType === "SPECIFIC_PRODUCTS" && (
-                        <Card background="bg-surface-secondary" padding="300">
-                          <InlineStack align="space-between" blockAlign="center"><Text>{(formData.productIds || []).length} products selected</Text><Button onClick={handleResourcePicker}>Choose products</Button></InlineStack>
-                        </Card>
+                        <Card background="bg-surface-secondary" padding="300"><InlineStack align="space-between" blockAlign="center"><Text>{(formData.productIds || []).length} products selected</Text><Button onClick={handleResourcePicker}>Choose products</Button></InlineStack></Card>
                       )}
                     </BlockStack>
                   </Card>
                 </BlockStack>
               </Grid.Cell>
 
-              {/* LIVE PREVIEW ENGINE (Perfected for premium views) */}
+              {/* PERFECT 1:1 PREVIEW ENGINE */}
               <Grid.Cell columnSpan={{ xs: 12, sm: 5, md: 5, lg: 5, xl: 5 }}>
                 <Box style={{ position: "sticky", top: "16px" }}>
                   <Card padding="400">
@@ -488,17 +436,27 @@ export default function SaaSAdminApp() {
                       <Box padding="600" borderRadius="300" style={{ minHeight: "320px", background: "#f3f4f6", display: "flex", justifyContent: "center", alignItems: "center" }}>
                         <div style={{ width: "230px", height: "280px", background: "#ffffff", borderRadius: "16px", overflow: "hidden", position: "relative" }}>
                           <div style={{ height: "175px", background: "#e5e7eb", position: "relative", overflow: "hidden" }}>
+                            
+                            {/* Wrapper isolates position from shapes */}
                             <div style={{
-                              position: "absolute",
+                              position: "absolute", zIndex: 10,
                               ...(safePosition.includes("TOP") ? { top: "10px" } : { bottom: "10px" }),
-                              ...(safePosition.includes("LEFT") ? { left: "10px" } : safePosition.includes("RIGHT") ? { right: "10px" } : { left: "50%", transform: "translateX(-50%)" }),
-                              ...(safePosition.includes("LEFT") && formData.shape === "RIBBON" ? { left: "0px" } : {}), // Flush left for ribbon
+                              ...(safePosition.includes("LEFT") ? { left: "10px" } : safePosition.includes("RIGHT") ? { right: "10px" } : { left: "50%", transform: "translateX(-50%)" })
                             }}>
-                              <div style={previewBadgeStyle}>
-                                {formData.icon && <span>{formData.icon}</span>}
+                              <div className={`fs-badge-ui fs-shape-${formData.shape}`} style={{
+                                backgroundColor: formData.shape === 'GLASSMORPHISM' ? formData.bgColor + "99" : formData.bgColor,
+                                color: formData.shape === 'OUTLINE' ? formData.bgColor : formData.textColor,
+                                borderColor: formData.borderColor || formData.bgColor,
+                                padding: `${formData.paddingY}px ${formData.paddingX}px`,
+                                fontSize: `${formData.fontSize}px`, fontWeight: formData.fontWeight,
+                                borderRadius: `${formData.borderRadius}px`, '--fs-glow-color': `${formData.bgColor}99`,
+                                '--fs-px': `${formData.paddingX}px`, '--fs-py': `${formData.paddingY}px`
+                              }}>
+                                {formData.icon && <span className="fs-badge-icon-wrap">{formData.icon}</span>}
                                 <span>{formData.text || "BADGE"}</span>
                               </div>
                             </div>
+
                           </div>
                           <div style={{ padding: "14px" }}><div style={{ height: "10px", width: "75%", background: "#d1d5db", marginBottom: "9px" }} /><div style={{ height: "13px", width: "45%", background: "#111827" }} /></div>
                         </div>

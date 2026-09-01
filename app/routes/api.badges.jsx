@@ -1,5 +1,5 @@
 import { json } from "@remix-run/node";
-import db from "../db.server"; // Adjust path according to your db connection file
+import db from "../db.server"; 
 
 function cleanProductId(id) {
   if (!id) return "";
@@ -11,11 +11,14 @@ export const loader = async ({ request }) => {
   const shop = url.searchParams.get("shop");
   const rawProductId = url.searchParams.get("productId");
 
+  // Cache busting headers - Ye rule aapki cache ki problem hamesha k liye khatam kar de ga
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, OPTIONS, POST",
     "Access-Control-Allow-Headers": "Content-Type",
-    "Cache-Control": "public, max-age=30, s-maxage=60",
+    "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
   };
 
   if (!shop) {
@@ -24,7 +27,6 @@ export const loader = async ({ request }) => {
 
   const now = new Date();
 
-  // Active / Enabled badges fetch kar rahe hain
   const badges = await db.badge.findMany({
     where: {
       shop,
@@ -68,15 +70,12 @@ export const loader = async ({ request }) => {
     };
   });
 
-  // Agar specific single product PDP route par request aayi ho
   let filteredBadges = formattedBadges;
   if (rawProductId) {
     const cleanId = cleanProductId(rawProductId);
     filteredBadges = formattedBadges.filter((badge) => {
       if (badge.targetType === "GLOBAL" || badge.isGlobal) return true;
-      if (badge.targetType === "SPECIFIC_PRODUCTS") {
-        return badge.productIds.includes(cleanId);
-      }
+      if (badge.targetType === "SPECIFIC_PRODUCTS") return badge.productIds.includes(cleanId);
       return true;
     });
   }

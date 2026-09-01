@@ -1,66 +1,43 @@
 <style>
-  /* Premium CSS Variables and Shapes for Badges */
-  .fs-custom-storefront-badge {
+  /* 1:1 Parity CSS Engine */
+  .fs-badge-wrapper {
     position: absolute !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 6px;
     z-index: 999 !important;
     pointer-events: none;
-    transition: all 0.3s ease;
-    text-transform: uppercase;
-    line-height: 1.1;
-    box-sizing: border-box;
   }
-
-  /* Shape Modifiers */
-  .fs-shape-PILL { border-radius: 50px !important; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-  .fs-shape-SHARP { border-radius: 0px !important; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-  
-  .fs-shape-OUTLINE { 
-    background-color: transparent !important; 
-    border-width: 2px !important; 
-    border-style: solid !important;
-  }
-
-  .fs-shape-GLASSMORPHISM {
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.3) !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
-  }
-
-  .fs-shape-FLOATING_GLOW {
-    border-radius: 50px !important;
-    border: none !important;
-    animation: fs-pulse-glow 2s infinite alternate;
-  }
-
-  @keyframes fs-pulse-glow {
-    0% { transform: scale(1); filter: brightness(1); }
-    100% { transform: scale(1.03); filter: brightness(1.1); }
-  }
-
-  .fs-shape-RIBBON {
-    border-radius: 0 !important;
-    border: none !important;
-    clip-path: polygon(0 0, 100% 0, 88% 50%, 100% 100%, 0 100%);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
-  }
-
-  /* Ribbon left flush */
-  .fs-pos-TOP_LEFT.fs-shape-RIBBON, .fs-pos-BOTTOM_LEFT.fs-shape-RIBBON {
-    left: 0 !important;
-  }
-
-  /* Positions */
   .fs-pos-TOP_LEFT { top: 10px; left: 10px; }
   .fs-pos-TOP_RIGHT { top: 10px; right: 10px; }
   .fs-pos-BOTTOM_LEFT { bottom: 10px; left: 10px; }
   .fs-pos-BOTTOM_RIGHT { bottom: 10px; right: 10px; }
   .fs-pos-CENTER_OVERLAY { top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
-  .fs-badge-icon-wrap { display: inline-flex; align-items: center; }
+  .fs-badge-ui {
+    display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important;
+    line-height: 1.2 !important; box-sizing: border-box !important; text-transform: uppercase !important;
+    white-space: nowrap !important; transition: all 0.3s ease !important; border: 1px solid transparent;
+  }
+  
+  .fs-shape-PILL { border-radius: 50px !important; }
+  .fs-shape-SHARP { border-radius: 0px !important; }
+  .fs-shape-OUTLINE { background-color: transparent !important; border-width: 2px !important; border-style: solid !important; }
+  .fs-shape-GLASSMORPHISM { backdrop-filter: blur(8px) !important; -webkit-backdrop-filter: blur(8px) !important; border-color: rgba(255,255,255,0.4) !important; box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important; }
+  .fs-shape-FLOATING_GLOW { border-radius: 50px !important; border: none !important; box-shadow: 0 0 15px var(--fs-glow-color) !important; animation: fs-pulse 2s infinite alternate !important; }
+  
+  /* Premium Image Replications */
+  .fs-shape-TAG { border-radius: 0 6px 6px 0 !important; clip-path: polygon(15px 0, 100% 0, 100% 100%, 15px 100%, 0 50%) !important; padding-left: calc(var(--fs-px) + 12px) !important; position: relative !important; }
+  .fs-shape-TAG::before { content: '' !important; position: absolute !important; left: 5px !important; top: 50% !important; transform: translateY(-50%) !important; width: 6px !important; height: 6px !important; background-color: rgba(255,255,255,0.8) !important; border-radius: 50% !important; box-shadow: 0 0 2px rgba(0,0,0,0.2); }
+  
+  .fs-shape-BOOKMARK { border-radius: 6px 0 0 6px !important; clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 50%, 100% 100%, 0 100%) !important; padding-right: calc(var(--fs-px) + 12px) !important; }
+  
+  .fs-shape-STARBURST { aspect-ratio: 1 !important; border-radius: 0 !important; clip-path: polygon(50% 0%, 61% 12%, 85% 12%, 85% 39%, 100% 50%, 85% 61%, 85% 88%, 61% 88%, 50% 100%, 39% 88%, 15% 88%, 15% 61%, 0% 50%, 15% 39%, 15% 12%, 39% 12%) !important; flex-direction: column !important; justify-content: center !important; text-align: center !important; white-space: normal !important; padding: calc(var(--fs-py) + 10px) !important; }
+  
+  .fs-shape-DIAGONAL { transform: skewX(-15deg) !important; border-radius: 4px !important; }
+  .fs-shape-DIAGONAL > * { transform: skewX(15deg) !important; }
+  
+  .fs-shape-RIBBON { clip-path: polygon(0 0, 100% 0, 88% 50%, 100% 100%, 0 100%) !important; border-radius: 0 !important; padding-right: calc(var(--fs-px) + 12px) !important; }
+  .fs-badge-icon-wrap { display: inline-flex !important; align-items: center !important; }
+  
+  @keyframes fs-pulse { 0% { transform: scale(1); } 100% { transform: scale(1.05); } }
 </style>
 
 <script>
@@ -81,10 +58,12 @@
 
     async function loadBadges() {
       try {
-        let response = await fetch(`${FALLBACK_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`, {
-          method: "GET", headers: { "Accept": "application/json" }, credentials: "same-origin", cache: "no-store"
+        // 🔥 Strict Cache Busting logic applied here
+        const timestamp = new Date().getTime();
+        let response = await fetch(`${FALLBACK_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}&t=${timestamp}`, {
+          method: "GET", headers: { "Accept": "application/json", "Cache-Control": "no-cache" }, credentials: "same-origin"
         });
-        if (!response.ok) response = await fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`);
+        if (!response.ok) response = await fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}&t=${timestamp}`, { headers: { "Cache-Control": "no-cache" } });
         if (!response.ok) return false;
 
         const data = await response.json();
@@ -102,14 +81,9 @@
     }
 
     function getProductCards() {
-      const selectors = [
-        ".card-wrapper", ".card.product-card", ".product-card", "product-card", 
-        ".grid__item .card", "li.grid__item", "[data-product-id]", ".product__media-wrapper"
-      ];
+      const selectors = [".card-wrapper", ".card.product-card", ".product-card", "product-card", ".grid__item .card", "li.grid__item", "[data-product-id]", ".product__media-wrapper"];
       const cards = new Set();
-      selectors.forEach((selector) => {
-        document.querySelectorAll(selector).forEach((el) => cards.add(el));
-      });
+      selectors.forEach((selector) => { document.querySelectorAll(selector).forEach((el) => cards.add(el)); });
       return Array.from(cards);
     }
 
@@ -122,7 +96,6 @@
       return false;
     }
 
-    // 🔥 Optimised Batch Rendering to avoid 1-by-1 popping
     function applyBadges() {
       if (!badgeConfiguration.length) return;
       const cards = getProductCards();
@@ -142,45 +115,47 @@
         const targetMedia = card.querySelector(".card__media") || card.querySelector(".media") || card.querySelector(".product-card__image-wrapper") || card.querySelector(".card__inner") || card;
         if (targetMedia.querySelector(`[data-badge-id="${match.id}"]`)) return;
 
-        // Queue DOM updates
         fragmentQueue.push({ targetMedia, match });
       });
 
-      // Inject all at once using requestAnimationFrame for butter smooth rendering
       requestAnimationFrame(() => {
         fragmentQueue.forEach(({ targetMedia, match }) => {
-          if (window.getComputedStyle(targetMedia).position === "static") {
-            targetMedia.style.position = "relative";
-          }
+          if (window.getComputedStyle(targetMedia).position === "static") targetMedia.style.position = "relative";
+
+          const wrapperEl = document.createElement("div");
+          wrapperEl.className = `fs-badge-wrapper fs-pos-${match.position || 'TOP_LEFT'}`;
+          wrapperEl.dataset.badgeId = match.id;
 
           const badgeEl = document.createElement("div");
-          badgeEl.className = `fs-custom-storefront-badge fs-shape-${match.shape || 'PILL'} fs-pos-${match.position || 'TOP_LEFT'}`;
-          badgeEl.dataset.badgeId = match.id;
+          badgeEl.className = `fs-badge-ui fs-shape-${match.shape || 'PILL'}`;
 
-          // Process Hex opacity for Glassmorphism
           let finalBg = match.bgColor || "#111827";
-          if (match.shape === "GLASSMORPHISM") finalBg = finalBg + "99"; // Add hex transparency
+          if (match.shape === "GLASSMORPHISM") finalBg = finalBg + "99"; 
 
-          // Apply specific inline colors and paddings
           badgeEl.style.cssText = `
-            padding: ${match.paddingY || 4}px ${match.shape === 'RIBBON' ? (match.paddingX || 10) + 12 : (match.paddingX || 10)}px ${match.paddingY || 4}px ${match.paddingX || 10}px;
+            padding: ${match.paddingY || 4}px ${match.paddingX || 10}px !important;
             background-color: ${match.shape === 'OUTLINE' ? 'transparent' : finalBg} !important;
             color: ${match.shape === 'OUTLINE' ? match.bgColor : (match.textColor || "#FFFFFF")} !important;
             border-color: ${match.borderColor || match.bgColor || "#000000"} !important;
-            font-size: ${match.fontSize || 12}px;
-            font-weight: ${match.fontWeight || "bold"};
+            font-size: ${match.fontSize || 12}px !important;
+            font-weight: ${match.fontWeight || "bold"} !important;
+            border-radius: ${match.borderRadius || 20}px !important;
+            --fs-px: ${match.paddingX || 10}px;
+            --fs-py: ${match.paddingY || 4}px;
+            --fs-glow-color: ${match.bgColor}80;
           `;
-
-          if (match.shape === "FLOATING_GLOW") {
-            badgeEl.style.boxShadow = `0 0 15px 2px ${match.bgColor}80`;
-          }
 
           let innerHTML = '';
           if (match.icon) innerHTML += `<span class="fs-badge-icon-wrap">${match.icon}</span>`;
-          innerHTML += `<span>${match.text || "BADGE"}</span>`;
+          if (match.shape === 'DIAGONAL') {
+              innerHTML += `<span><span>${match.text || "BADGE"}</span></span>`;
+          } else {
+              innerHTML += `<span>${match.text || "BADGE"}</span>`;
+          }
           
           badgeEl.innerHTML = innerHTML;
-          targetMedia.appendChild(badgeEl);
+          wrapperEl.appendChild(badgeEl);
+          targetMedia.appendChild(wrapperEl);
         });
       });
     }
@@ -190,13 +165,9 @@
       if (loaded) applyBadges();
     }
 
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", init);
-    } else {
-      init();
-    }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+    else init();
 
-    // Debounce mutation observer to save heavy client performance
     let timeout;
     const observer = new MutationObserver(() => {
       clearTimeout(timeout);
