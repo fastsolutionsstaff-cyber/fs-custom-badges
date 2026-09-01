@@ -1,5 +1,5 @@
 import { json } from "@remix-run/node";
-import db from "../db.server"; 
+import db from "../db.server";
 
 function cleanProductId(id) {
   if (!id) return "";
@@ -11,7 +11,6 @@ export const loader = async ({ request }) => {
   const shop = url.searchParams.get("shop");
   const rawProductId = url.searchParams.get("productId");
 
-  // Cache busting headers - Ye rule aapki cache ki problem hamesha k liye khatam kar de ga
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, OPTIONS, POST",
@@ -75,7 +74,9 @@ export const loader = async ({ request }) => {
     const cleanId = cleanProductId(rawProductId);
     filteredBadges = formattedBadges.filter((badge) => {
       if (badge.targetType === "GLOBAL" || badge.isGlobal) return true;
-      if (badge.targetType === "SPECIFIC_PRODUCTS") return badge.productIds.includes(cleanId);
+      if (badge.targetType === "SPECIFIC_PRODUCTS") {
+        return badge.productIds.includes(cleanId);
+      }
       return true;
     });
   }
