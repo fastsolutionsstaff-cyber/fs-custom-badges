@@ -2,9 +2,8 @@
   (function () {
     "use strict";
 
-    // Matching exact route API
-    const API_ENDPOINT = "/apps/proxy/api/badges"; // Agar App Proxy set ho, warna direct URL use karein
-    const FALLBACK_ENDPOINT = "/api/badges"; 
+    // Correct Shopify App Proxy endpoint
+    const API_ENDPOINT = "/apps/badges";
     const SHOP_DOMAIN = "{{ shop.permanent_domain }}";
 
     let badgeConfiguration = [];
@@ -18,25 +17,18 @@
 
     async function loadBadges() {
       try {
-        let response = await fetch(
-          `${FALLBACK_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`,
+        const response = await fetch(
+          `${API_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`,
           {
             method: "GET",
             headers: { "Accept": "application/json" },
-            credentials: "same-origin",
             cache: "no-store"
           }
         );
 
-        if (!response.ok) {
-          response = await fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`);
-        }
-
         if (!response.ok) return false;
 
         const data = await response.json();
-        console.log("👉 [Badges App]: Loaded Config", data);
-
         if (!data.success || !Array.isArray(data.badges)) return false;
 
         badgeConfiguration = data.badges;
@@ -50,7 +42,6 @@
 
         return true;
       } catch (error) {
-        console.error("[Badges App] Error loading badges:", error);
         return false;
       }
     }
@@ -64,7 +55,8 @@
         ".grid__item .card",
         "li.grid__item",
         "[data-product-id]",
-        ".product__media-wrapper"
+        ".product__media-wrapper",
+        ".card__inner"
       ];
 
       const cards = new Set();
@@ -138,16 +130,19 @@
         ${posCSS}
         display: inline-flex !important;
         align-items: center !important;
-        gap: 4px;
-        padding: ${badge.paddingY || 4}px ${badge.paddingX || 10}px;
+        gap: 6px;
+        padding: ${badge.paddingY || 6}px ${badge.paddingX || 14}px;
         background-color: ${badge.bgColor || "#111827"} !important;
         color: ${badge.textColor || "#FFFFFF"} !important;
-        border: 1px solid ${badge.borderColor || badge.bgColor || "#000000"};
-        border-radius: ${badge.borderRadius || 20}px;
+        border: 1.5px solid ${badge.borderColor || badge.bgColor || "#374151"};
+        border-radius: ${badge.shape === "PILL" ? "999px" : `${badge.borderRadius || 25}px`};
         font-size: ${badge.fontSize || 12}px;
         font-weight: ${badge.fontWeight || "bold"};
-        z-index: 999 !important;
+        z-index: 99 !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         pointer-events: none;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
       `;
 
       if (badge.icon) {
@@ -161,6 +156,13 @@
       badgeEl.appendChild(textSpan);
 
       targetMedia.appendChild(badgeEl);
+
+      // Track Impression
+      fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ badgeId: badge.id, eventType: "IMPRESSION" }),
+      }).catch(() => {});
     }
 
     function applyBadges() {
@@ -169,10 +171,14 @@
 
       cards.forEach((card) => {
         const productData = getProductData(card);
-        const match = badgeConfiguration.find((badge) => isEligible(badge, productData));
+        const match = badgeConfiguration.path ? null : badgeConfiguration.find((badge) => isEligible(badge, productData));
 
         if (match) {
           renderBadge(card, match);
+        } else {
+          // fallback search
+          const foundMatch = badgeConfiguration.find((badge) => isEligible(badge, productData));
+          if (foundMatch) renderBadge(card, foundMatch);
         }
       });
     }
@@ -199,7 +205,7 @@
 
 {% schema %}
 {
-  "name": "Badge Engine Embed",
+  "name": "Badge Engine Embed Pro",
   "target": "body",
   "settings": []
 }
