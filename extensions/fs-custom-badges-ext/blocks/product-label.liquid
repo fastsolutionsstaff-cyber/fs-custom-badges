@@ -23,11 +23,11 @@
     <span>{{ block.settings.preview_text | default: "⚡ LIMITED STOCK" }}</span>
   </span>
 </div>
+{% endif %}
 
 <style>
   .fs-pdp-label-wrapper { display: flex; align-items: center; width: 100%; }
   
-  /* Fallback CSS if grid block is missing */
   .fs-badge-ui { display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important; line-height: 1.2 !important; box-sizing: border-box !important; text-transform: uppercase !important; white-space: nowrap !important; transition: all 0.3s ease !important; cursor: pointer; }
   .fs-shape-PILL { border-radius: 50px !important; }
   .fs-shape-SHARP { border-radius: 0px !important; }
@@ -88,7 +88,7 @@
 
     async function fetchPDPLabel() {
       try {
-        const timestamp = new Date().getTime(); // Fresh data every time
+        const timestamp = new Date().getTime(); 
         let response = await fetch(`${FALLBACK_ENDPOINT}?shop=${encodeURIComponent(shop)}&t=${timestamp}`, { headers: { "Cache-Control": "no-cache" } });
         if (!response.ok) response = await fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(shop)}&t=${timestamp}`, { headers: { "Cache-Control": "no-cache" } });
         if (!response.ok) return;
