@@ -1,9 +1,73 @@
+<style>
+  /* Premium CSS Variables and Shapes for Badges */
+  .fs-custom-storefront-badge {
+    position: absolute !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px;
+    z-index: 999 !important;
+    pointer-events: none;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    line-height: 1.1;
+    box-sizing: border-box;
+  }
+
+  /* Shape Modifiers */
+  .fs-shape-PILL { border-radius: 50px !important; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+  .fs-shape-SHARP { border-radius: 0px !important; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+  
+  .fs-shape-OUTLINE { 
+    background-color: transparent !important; 
+    border-width: 2px !important; 
+    border-style: solid !important;
+  }
+
+  .fs-shape-GLASSMORPHISM {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
+  }
+
+  .fs-shape-FLOATING_GLOW {
+    border-radius: 50px !important;
+    border: none !important;
+    animation: fs-pulse-glow 2s infinite alternate;
+  }
+
+  @keyframes fs-pulse-glow {
+    0% { transform: scale(1); filter: brightness(1); }
+    100% { transform: scale(1.03); filter: brightness(1.1); }
+  }
+
+  .fs-shape-RIBBON {
+    border-radius: 0 !important;
+    border: none !important;
+    clip-path: polygon(0 0, 100% 0, 88% 50%, 100% 100%, 0 100%);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
+  }
+
+  /* Ribbon left flush */
+  .fs-pos-TOP_LEFT.fs-shape-RIBBON, .fs-pos-BOTTOM_LEFT.fs-shape-RIBBON {
+    left: 0 !important;
+  }
+
+  /* Positions */
+  .fs-pos-TOP_LEFT { top: 10px; left: 10px; }
+  .fs-pos-TOP_RIGHT { top: 10px; right: 10px; }
+  .fs-pos-BOTTOM_LEFT { bottom: 10px; left: 10px; }
+  .fs-pos-BOTTOM_RIGHT { bottom: 10px; right: 10px; }
+  .fs-pos-CENTER_OVERLAY { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+
+  .fs-badge-icon-wrap { display: inline-flex; align-items: center; }
+</style>
+
 <script>
   (function () {
     "use strict";
 
-    // Matching exact route API
-    const API_ENDPOINT = "/apps/proxy/api/badges"; // Agar App Proxy set ho, warna direct URL use karein
+    const API_ENDPOINT = "/apps/proxy/api/badges";
     const FALLBACK_ENDPOINT = "/api/badges"; 
     const SHOP_DOMAIN = "{{ shop.permanent_domain }}";
 
@@ -11,177 +75,119 @@
 
     function cleanNumericId(val) {
       if (!val) return null;
-      const str = String(val);
-      const match = str.match(/(\d+)/g);
+      const match = String(val).match(/(\d+)/g);
       return match ? match.join("") : null;
     }
 
     async function loadBadges() {
       try {
-        let response = await fetch(
-          `${FALLBACK_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`,
-          {
-            method: "GET",
-            headers: { "Accept": "application/json" },
-            credentials: "same-origin",
-            cache: "no-store"
-          }
-        );
-
-        if (!response.ok) {
-          response = await fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`);
-        }
-
+        let response = await fetch(`${FALLBACK_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`, {
+          method: "GET", headers: { "Accept": "application/json" }, credentials: "same-origin", cache: "no-store"
+        });
+        if (!response.ok) response = await fetch(`${API_ENDPOINT}?shop=${encodeURIComponent(SHOP_DOMAIN)}`);
         if (!response.ok) return false;
 
         const data = await response.json();
-        console.log("👉 [Badges App]: Loaded Config", data);
-
         if (!data.success || !Array.isArray(data.badges)) return false;
-
+        
         badgeConfiguration = data.badges;
-
         if (data.globalCustomCss && !document.getElementById("fs-badges-global-css")) {
           const style = document.createElement("style");
           style.id = "fs-badges-global-css";
           style.textContent = data.globalCustomCss;
           document.head.appendChild(style);
         }
-
         return true;
-      } catch (error) {
-        console.error("[Badges App] Error loading badges:", error);
-        return false;
-      }
+      } catch (error) { return false; }
     }
 
     function getProductCards() {
       const selectors = [
-        ".card-wrapper",
-        ".card.product-card",
-        ".product-card",
-        "product-card",
-        ".grid__item .card",
-        "li.grid__item",
-        "[data-product-id]",
-        ".product__media-wrapper"
+        ".card-wrapper", ".card.product-card", ".product-card", "product-card", 
+        ".grid__item .card", "li.grid__item", "[data-product-id]", ".product__media-wrapper"
       ];
-
       const cards = new Set();
       selectors.forEach((selector) => {
         document.querySelectorAll(selector).forEach((el) => cards.add(el));
       });
-
       return Array.from(cards);
     }
 
-    function getProductData(card) {
-      let productId = null;
-
-      if (card.dataset.productId) {
-        productId = cleanNumericId(card.dataset.productId);
-      }
-
-      if (!productId) {
-        const idElem = card.querySelector("[data-product-id], [data-id], [id*='CardArticle-']");
-        if (idElem) {
-          const raw = idElem.dataset.productId || idElem.dataset.id || idElem.id;
-          productId = cleanNumericId(raw);
-        }
-      }
-
-      return { productId };
-    }
-
-    function isEligible(badge, productData) {
+    function isEligible(badge, productId) {
       if (!badge.enabled) return false;
-
-      if (badge.targetType === "GLOBAL" || badge.isGlobal) {
-        return true;
+      if (badge.targetType === "GLOBAL" || badge.isGlobal) return true;
+      if (badge.targetType === "SPECIFIC_PRODUCTS" && productId) {
+        return (badge.productIds || []).map(cleanNumericId).includes(productId);
       }
-
-      if (badge.targetType === "SPECIFIC_PRODUCTS") {
-        if (!productData.productId) return false;
-        const targetIds = (badge.productIds || []).map((id) => cleanNumericId(id));
-        return targetIds.includes(productData.productId);
-      }
-
       return false;
     }
 
-    function renderBadge(card, badge) {
-      const targetMedia =
-        card.querySelector(".card__media") ||
-        card.querySelector(".media") ||
-        card.querySelector(".product-card__image-wrapper") ||
-        card.querySelector(".card__inner") ||
-        card;
-
-      if (targetMedia.querySelector(`[data-badge-id="${badge.id}"]`)) return;
-
-      if (window.getComputedStyle(targetMedia).position === "static") {
-        targetMedia.style.position = "relative";
-      }
-
-      const badgeEl = document.createElement("div");
-      badgeEl.className = "fs-custom-storefront-badge";
-      badgeEl.dataset.badgeId = badge.id;
-
-      let posCSS = "top: 10px; left: 10px;";
-      if (badge.position === "TOP_RIGHT") posCSS = "top: 10px; right: 10px;";
-      else if (badge.position === "BOTTOM_LEFT") posCSS = "bottom: 10px; left: 10px;";
-      else if (badge.position === "BOTTOM_RIGHT") posCSS = "bottom: 10px; right: 10px;";
-      else if (badge.position === "CENTER_OVERLAY") posCSS = "top: 50%; left: 50%; transform: translate(-50%, -50%);";
-
-      badgeEl.style.cssText = `
-        position: absolute !important;
-        ${posCSS}
-        display: inline-flex !important;
-        align-items: center !important;
-        gap: 4px;
-        padding: ${badge.paddingY || 4}px ${badge.paddingX || 10}px;
-        background-color: ${badge.bgColor || "#111827"} !important;
-        color: ${badge.textColor || "#FFFFFF"} !important;
-        border: 1px solid ${badge.borderColor || badge.bgColor || "#000000"};
-        border-radius: ${badge.borderRadius || 20}px;
-        font-size: ${badge.fontSize || 12}px;
-        font-weight: ${badge.fontWeight || "bold"};
-        z-index: 999 !important;
-        pointer-events: none;
-      `;
-
-      if (badge.icon) {
-        const iconSpan = document.createElement("span");
-        iconSpan.textContent = badge.icon;
-        badgeEl.appendChild(iconSpan);
-      }
-
-      const textSpan = document.createElement("span");
-      textSpan.textContent = badge.text || "BADGE";
-      badgeEl.appendChild(textSpan);
-
-      targetMedia.appendChild(badgeEl);
-    }
-
+    // 🔥 Optimised Batch Rendering to avoid 1-by-1 popping
     function applyBadges() {
       if (!badgeConfiguration.length) return;
       const cards = getProductCards();
+      const fragmentQueue = []; 
 
       cards.forEach((card) => {
-        const productData = getProductData(card);
-        const match = badgeConfiguration.find((badge) => isEligible(badge, productData));
-
-        if (match) {
-          renderBadge(card, match);
+        let productId = null;
+        if (card.dataset.productId) productId = cleanNumericId(card.dataset.productId);
+        if (!productId) {
+          const idElem = card.querySelector("[data-product-id], [data-id], [id*='CardArticle-']");
+          if (idElem) productId = cleanNumericId(idElem.dataset.productId || idElem.dataset.id || idElem.id);
         }
+
+        const match = badgeConfiguration.find((badge) => isEligible(badge, productId));
+        if (!match) return;
+
+        const targetMedia = card.querySelector(".card__media") || card.querySelector(".media") || card.querySelector(".product-card__image-wrapper") || card.querySelector(".card__inner") || card;
+        if (targetMedia.querySelector(`[data-badge-id="${match.id}"]`)) return;
+
+        // Queue DOM updates
+        fragmentQueue.push({ targetMedia, match });
+      });
+
+      // Inject all at once using requestAnimationFrame for butter smooth rendering
+      requestAnimationFrame(() => {
+        fragmentQueue.forEach(({ targetMedia, match }) => {
+          if (window.getComputedStyle(targetMedia).position === "static") {
+            targetMedia.style.position = "relative";
+          }
+
+          const badgeEl = document.createElement("div");
+          badgeEl.className = `fs-custom-storefront-badge fs-shape-${match.shape || 'PILL'} fs-pos-${match.position || 'TOP_LEFT'}`;
+          badgeEl.dataset.badgeId = match.id;
+
+          // Process Hex opacity for Glassmorphism
+          let finalBg = match.bgColor || "#111827";
+          if (match.shape === "GLASSMORPHISM") finalBg = finalBg + "99"; // Add hex transparency
+
+          // Apply specific inline colors and paddings
+          badgeEl.style.cssText = `
+            padding: ${match.paddingY || 4}px ${match.shape === 'RIBBON' ? (match.paddingX || 10) + 12 : (match.paddingX || 10)}px ${match.paddingY || 4}px ${match.paddingX || 10}px;
+            background-color: ${match.shape === 'OUTLINE' ? 'transparent' : finalBg} !important;
+            color: ${match.shape === 'OUTLINE' ? match.bgColor : (match.textColor || "#FFFFFF")} !important;
+            border-color: ${match.borderColor || match.bgColor || "#000000"} !important;
+            font-size: ${match.fontSize || 12}px;
+            font-weight: ${match.fontWeight || "bold"};
+          `;
+
+          if (match.shape === "FLOATING_GLOW") {
+            badgeEl.style.boxShadow = `0 0 15px 2px ${match.bgColor}80`;
+          }
+
+          let innerHTML = '';
+          if (match.icon) innerHTML += `<span class="fs-badge-icon-wrap">${match.icon}</span>`;
+          innerHTML += `<span>${match.text || "BADGE"}</span>`;
+          
+          badgeEl.innerHTML = innerHTML;
+          targetMedia.appendChild(badgeEl);
+        });
       });
     }
 
     async function init() {
       const loaded = await loadBadges();
-      if (loaded) {
-        applyBadges();
-      }
+      if (loaded) applyBadges();
     }
 
     if (document.readyState === "loading") {
@@ -190,10 +196,13 @@
       init();
     }
 
-    const observer = new MutationObserver(() => applyBadges());
-    if (document.body) {
-      observer.observe(document.body, { childList: true, subtree: true });
-    }
+    // Debounce mutation observer to save heavy client performance
+    let timeout;
+    const observer = new MutationObserver(() => {
+      clearTimeout(timeout);
+      timeout = setTimeout(applyBadges, 150);
+    });
+    if (document.body) observer.observe(document.body, { childList: true, subtree: true });
   })();
 </script>
 
