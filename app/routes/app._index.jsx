@@ -137,49 +137,49 @@ const STANDARD_PRESETS = {
 };
 
 const PREMIUM_PRESETS = {
-  PREMIUM_RIBBON: {
-    text: "NEW",
-    icon: "",
+  GLASS_GLOW: {
+    text: "EXCLUSIVE",
+    icon: "✨",
+    bgColor: "#1E1B4B",
+    textColor: "#C084FC",
+    borderColor: "#7C3AED",
+    shape: "GLASS_GLOW",
+    paddingX: 14,
+    paddingY: 6,
+    borderRadius: 12,
+  },
+  DIAGONAL_SLASH: {
+    text: "HOT DEAL",
+    icon: "⚡",
     bgColor: "#DC2626",
     textColor: "#FFFFFF",
     borderColor: "#991B1B",
-    shape: "RIBBON_BANNER",
-    paddingX: 12,
-    paddingY: 6,
-    borderRadius: 2,
-  },
-  STARBURST_SEAL: {
-    text: "NEW",
-    icon: "",
-    bgColor: "#DC2626",
-    textColor: "#FFFFFF",
-    borderColor: "#B91C1C",
-    shape: "STARBURST",
-    paddingX: 12,
-    paddingY: 6,
-    borderRadius: 6,
-  },
-  CORNER_TAG: {
-    text: "NEW",
-    icon: "",
-    bgColor: "#DC2626",
-    textColor: "#FFFFFF",
-    borderColor: "#991B1B",
-    shape: "CORNER_FOLD",
-    paddingX: 12,
+    shape: "DIAGONAL_SLASH",
+    paddingX: 14,
     paddingY: 6,
     borderRadius: 4,
   },
-  FOLDED_RIBBON: {
-    text: "NEW",
-    icon: "",
-    bgColor: "#B91C1C",
-    textColor: "#FFFFFF",
-    borderColor: "#7F1D1D",
-    shape: "FOLDED_RIBBON",
-    paddingX: 12,
+  LUXURY_SEAL: {
+    text: "LUXURY",
+    icon: "👑",
+    bgColor: "#78350F",
+    textColor: "#FDE68A",
+    borderColor: "#F59E0B",
+    shape: "LUXURY_SEAL",
+    paddingX: 16,
+    paddingY: 8,
+    borderRadius: 999,
+  },
+  ELEVATED_3D: {
+    text: "LIMITED",
+    icon: "🔥",
+    bgColor: "#065F46",
+    textColor: "#A7F3D0",
+    borderColor: "#047857",
+    shape: "ELEVATED_3D",
+    paddingX: 14,
     paddingY: 6,
-    borderRadius: 2,
+    borderRadius: 8,
   },
 };
 
@@ -466,16 +466,16 @@ export default function SaaSAdminApp() {
     setModalType(type);
     if (badge) {
       setFormData(badgeToForm(badge));
-      const isPrem = ["RIBBON_BANNER", "STARBURST", "CORNER_FOLD", "FOLDED_RIBBON"].includes(badge.shape);
+      const isPrem = ["GLASS_GLOW", "DIAGONAL_SLASH", "LUXURY_SEAL", "ELEVATED_3D"].includes(badge.shape);
       setModalType(isPrem ? "premium" : "standard");
     } else {
       setFormData({
         ...DEFAULT_FORM,
         id: "new",
         name: type === "premium" ? `Premium Badge #${badges.length + 1}` : `Badge Campaign #${badges.length + 1}`,
-        shape: type === "premium" ? "RIBBON_BANNER" : "PILL",
-        text: type === "premium" ? "NEW" : "LIMITED STOCK",
-        icon: type === "premium" ? "" : "⚡",
+        shape: type === "premium" ? "GLASS_GLOW" : "PILL",
+        text: type === "premium" ? "EXCLUSIVE" : "LIMITED STOCK",
+        icon: type === "premium" ? "✨" : "⚡",
       });
     }
     setModalOpen(true);
@@ -550,14 +550,14 @@ export default function SaaSAdminApp() {
   };
 
   // -------------------------------------------------------------
-  // DYNAMIC RENDERER FOR PREMIUM SHAPES USING CLIP-PATH
+  // FULLY CUSTOMIZABLE PREVIEW STYLES FOR PREMIUM BADGES
   // -------------------------------------------------------------
-  let isPremiumShape = ["RIBBON_BANNER", "STARBURST", "CORNER_FOLD", "FOLDED_RIBBON"].includes(formData.shape);
+  let isPremiumShape = ["GLASS_GLOW", "DIAGONAL_SLASH", "LUXURY_SEAL", "ELEVATED_3D"].includes(formData.shape);
 
   let previewShapeStyles = {
     background: formData.bgColor || "#DC2626",
     color: formData.textColor || "#FFFFFF",
-    border: isPremiumShape ? "none" : `1px solid ${formData.borderColor || formData.bgColor || "#991B1B"}`,
+    border: `1px solid ${formData.borderColor || formData.bgColor || "#991B1B"}`,
     borderRadius: `${formData.borderRadius || 20}px`,
     padding: `${formData.paddingY || 4}px ${formData.paddingX || 10}px`,
     fontSize: `${formData.fontSize || 12}px`,
@@ -569,23 +569,48 @@ export default function SaaSAdminApp() {
     textTransform: "uppercase",
   };
 
-  if (formData.shape === "RIBBON_BANNER") {
-    previewShapeStyles.borderRadius = "0px";
-    previewShapeStyles.clipPath = "polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%)";
-    previewShapeStyles.paddingRight = `${(formData.paddingX || 12) + 12}px`;
-  } else if (formData.shape === "STARBURST") {
-    previewShapeStyles.borderRadius = "0px";
-    previewShapeStyles.clipPath = "polygon(50% 0%, 61% 15%, 79% 9%, 83% 26%, 100% 33%, 93% 50%, 100% 67%, 83% 74%, 79% 91%, 61% 85%, 50% 100%, 39% 85%, 21% 91%, 25% 74%, 0% 67%, 7% 50%, 0% 33%, 25% 26%, 21% 9%, 39% 15%)";
-    previewShapeStyles.padding = `${(formData.paddingY || 6) + 12}px ${(formData.paddingX || 12) + 8}px`;
-  } else if (formData.shape === "CORNER_FOLD") {
-    previewShapeStyles.borderRadius = "0px";
-    previewShapeStyles.clipPath = "polygon(15% 0, 100% 0, 100% 100%, 15% 100%, 0 50%)";
-    previewShapeStyles.paddingLeft = `${(formData.paddingX || 12) + 12}px`;
-  } else if (formData.shape === "FOLDED_RIBBON") {
-    previewShapeStyles.borderRadius = "0px";
-    previewShapeStyles.clipPath = "polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%)";
-    previewShapeStyles.paddingLeft = `${(formData.paddingX || 12) + 10}px`;
-    previewShapeStyles.paddingRight = `${(formData.paddingX || 12) + 10}px`;
+  if (formData.shape === "GLASS_GLOW") {
+    previewShapeStyles = {
+      ...previewShapeStyles,
+      background: formData.bgColor || "#1E1B4B",
+      color: formData.textColor || "#C084FC",
+      border: `1px solid ${formData.borderColor || "#7C3AED"}`,
+      borderRadius: `${formData.borderRadius || 12}px`,
+      padding: `${formData.paddingY || 6}px ${formData.paddingX || 14}px`,
+      backdropFilter: "blur(12px)",
+      boxShadow: `0 8px 32px rgba(0,0,0,0.25), 0 0 15px ${formData.bgColor || "#7C3AED"}`,
+    };
+  } else if (formData.shape === "DIAGONAL_SLASH") {
+    previewShapeStyles = {
+      ...previewShapeStyles,
+      background: formData.bgColor || "#DC2626",
+      color: formData.textColor || "#FFFFFF",
+      border: `1px solid ${formData.borderColor || "#991B1B"}`,
+      borderRadius: `${formData.borderRadius || 4}px`,
+      padding: `${formData.paddingY || 6}px ${formData.paddingX || 14}px`,
+      clipPath: "polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%)",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+    };
+  } else if (formData.shape === "LUXURY_SEAL") {
+    previewShapeStyles = {
+      ...previewShapeStyles,
+      background: formData.bgColor || "#78350F",
+      color: formData.textColor || "#FDE68A",
+      border: `2px dashed ${formData.borderColor || "#F59E0B"}`,
+      borderRadius: `${formData.borderRadius || 999}px`,
+      padding: `${formData.paddingY || 8}px ${formData.paddingX || 16}px`,
+      boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+    };
+  } else if (formData.shape === "ELEVATED_3D") {
+    previewShapeStyles = {
+      ...previewShapeStyles,
+      background: formData.bgColor || "#065F46",
+      color: formData.textColor || "#A7F3D0",
+      border: `1px solid ${formData.borderColor || "#047857"}`,
+      borderRadius: `${formData.borderRadius || 8}px`,
+      padding: `${formData.paddingY || 6}px ${formData.paddingX || 14}px`,
+      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.4), 0 8px 10px -6px rgba(0,0,0,0.4)",
+    };
   }
 
   return (
@@ -707,13 +732,13 @@ export default function SaaSAdminApp() {
                   >
                     {badges.map((badge, index) => {
                       const ctr = badge.impressions > 0 ? ((badge.clicks / badge.impressions) * 100).toFixed(2) : "0.00";
-                      const isPrem = ["RIBBON_BANNER", "STARBURST", "CORNER_FOLD", "FOLDED_RIBBON"].includes(badge.shape);
+                      const isPrem = ["GLASS_GLOW", "DIAGONAL_SLASH", "LUXURY_SEAL", "ELEVATED_3D"].includes(badge.shape);
                       
                       let tableBadgeStyle = {
                           background: badge.shape === "OUTLINE" ? "transparent" : badge.bgColor,
                           color: badge.shape === "OUTLINE" ? badge.bgColor : badge.textColor,
-                          border: isPrem ? "none" : `1px solid ${badge.borderColor || badge.bgColor}`,
-                          borderRadius: badge.shape === "PILL" ? "999px" : badge.shape === "SHARP" ? "0px" : `${badge.borderRadius}px`,
+                          border: `1px solid ${badge.borderColor || badge.bgColor}`,
+                          borderRadius: `${badge.borderRadius}px`,
                           padding: `4px 10px`,
                           fontSize: `12px`,
                           fontWeight: badge.fontWeight || "700",
@@ -724,33 +749,24 @@ export default function SaaSAdminApp() {
                           whiteSpace: "nowrap",
                       };
 
-                      if (badge.shape === "RIBBON_BANNER") {
-                        tableBadgeStyle.borderRadius = "0px";
-                        tableBadgeStyle.clipPath = "polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%)";
-                        tableBadgeStyle.paddingRight = `16px`;
-                      } else if (badge.shape === "STARBURST") {
-                        tableBadgeStyle.borderRadius = "0px";
-                        tableBadgeStyle.clipPath = "polygon(50% 0%, 61% 15%, 79% 9%, 83% 26%, 100% 33%, 93% 50%, 100% 67%, 83% 74%, 79% 91%, 61% 85%, 50% 100%, 39% 85%, 21% 91%, 25% 74%, 0% 67%, 7% 50%, 0% 33%, 25% 26%, 21% 9%, 39% 15%)";
-                        tableBadgeStyle.padding = `10px 12px`;
-                      } else if (badge.shape === "CORNER_FOLD") {
-                        tableBadgeStyle.borderRadius = "0px";
-                        tableBadgeStyle.clipPath = "polygon(15% 0, 100% 0, 100% 100%, 15% 100%, 0 50%)";
-                        tableBadgeStyle.paddingLeft = `16px`;
-                      } else if (badge.shape === "FOLDED_RIBBON") {
-                        tableBadgeStyle.borderRadius = "0px";
-                        tableBadgeStyle.clipPath = "polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%)";
-                        tableBadgeStyle.paddingLeft = `14px`;
-                        tableBadgeStyle.paddingRight = `14px`;
+                      if (badge.shape === "GLASS_GLOW") {
+                        tableBadgeStyle.border = `1px solid ${badge.borderColor || badge.bgColor}`;
+                        tableBadgeStyle.boxShadow = `0 4px 15px rgba(0,0,0,0.2), 0 0 10px ${badge.bgColor}`;
+                      } else if (badge.shape === "DIAGONAL_SLASH") {
+                        tableBadgeStyle.clipPath = "polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%)";
+                        tableBadgeStyle.padding = `4px 14px`;
+                      } else if (badge.shape === "LUXURY_SEAL") {
+                        tableBadgeStyle.border = `2px dashed ${badge.borderColor || badge.textColor}`;
+                      } else if (badge.shape === "ELEVATED_3D") {
+                        tableBadgeStyle.boxShadow = "0 6px 15px rgba(0,0,0,0.3)";
                       }
 
                       return (
                         <IndexTable.Row id={badge.id} key={badge.id} position={index}>
                           <IndexTable.Cell>
-                            <div style={{ filter: isPrem ? "drop-shadow(0px 2px 4px rgba(0,0,0,0.25))" : "none" }}>
-                                <div style={tableBadgeStyle}>
-                                  {badge.icon && <span>{badge.icon}</span>}
-                                  <span>{badge.text}</span>
-                                </div>
+                            <div style={tableBadgeStyle}>
+                              {badge.icon && <span>{badge.icon}</span>}
+                              <span>{badge.text}</span>
                             </div>
                           </IndexTable.Cell>
                           <IndexTable.Cell>
@@ -871,15 +887,15 @@ export default function SaaSAdminApp() {
                   <Card padding="400">
                     <BlockStack gap="300">
                       <Text variant="headingMd">
-                        {modalType === "premium" ? "Premium 3D Badge Presets" : "Quick styles"}
+                        {modalType === "premium" ? "Premium Style Presets" : "Quick styles"}
                       </Text>
                       <InlineStack gap="200" wrap>
                         {modalType === "premium" ? (
                           <>
-                            <Button onClick={() => handleApplyPreset("PREMIUM_RIBBON")}>Ribbon Banner</Button>
-                            <Button onClick={() => handleApplyPreset("STARBURST_SEAL")}>Starburst Seal</Button>
-                            <Button onClick={() => handleApplyPreset("CORNER_TAG")}>Corner Tag</Button>
-                            <Button onClick={() => handleApplyPreset("FOLDED_RIBBON")}>Folded Ribbon</Button>
+                            <Button onClick={() => handleApplyPreset("GLASS_GLOW")}>Glass Glow</Button>
+                            <Button onClick={() => handleApplyPreset("DIAGONAL_SLASH")}>Diagonal Slash</Button>
+                            <Button onClick={() => handleApplyPreset("LUXURY_SEAL")}>Luxury Seal</Button>
+                            <Button onClick={() => handleApplyPreset("ELEVATED_3D")}>Elevated 3D</Button>
                           </>
                         ) : (
                           <>
@@ -900,21 +916,19 @@ export default function SaaSAdminApp() {
                       <Text variant="headingMd">Badge content</Text>
                       <TextField label="Internal name" value={formData.name} onChange={(v) => updateForm("name", v)} autoComplete="off" />
                       <Grid>
-                        <Grid.Cell columnSpan={{ xs: modalType === "premium" ? 12 : 8, sm: modalType === "premium" ? 12 : 8, md: modalType === "premium" ? 12 : 8, lg: modalType === "premium" ? 12 : 8, xl: modalType === "premium" ? 12 : 8 }}>
+                        <Grid.Cell columnSpan={{ xs: 8, sm: 8, md: 8, lg: 8, xl: 8 }}>
                           <TextField label="Badge text" value={formData.text} onChange={(v) => updateForm("text", v)} autoComplete="off" />
                         </Grid.Cell>
-                        {modalType !== "premium" && (
-                          <Grid.Cell columnSpan={{ xs: 4, sm: 4, md: 4, lg: 4, xl: 4 }}>
-                            <TextField label="Icon" value={formData.icon} onChange={(v) => updateForm("icon", v)} autoComplete="off" />
-                          </Grid.Cell>
-                        )}
+                        <Grid.Cell columnSpan={{ xs: 4, sm: 4, md: 4, lg: 4, xl: 4 }}>
+                          <TextField label="Icon / Emoji" value={formData.icon} onChange={(v) => updateForm("icon", v)} autoComplete="off" />
+                        </Grid.Cell>
                       </Grid>
                     </BlockStack>
                   </Card>
 
                   <Card padding="400">
                     <BlockStack gap="400">
-                      <Text variant="headingMd">Appearance</Text>
+                      <Text variant="headingMd">Full Customization (Colors, Shape & Size)</Text>
                       <Grid>
                         <Grid.Cell columnSpan={{ xs: 4, sm: 4, md: 4, lg: 4, xl: 4 }}>
                           <TextField label="Background" type="color" value={formData.bgColor} onChange={(v) => updateForm("bgColor", v)} />
@@ -932,10 +946,10 @@ export default function SaaSAdminApp() {
                         options={
                           modalType === "premium"
                             ? [
-                                { label: "Ribbon Banner (Premium 3D)", value: "RIBBON_BANNER" },
-                                { label: "Starburst Seal (Premium 3D)", value: "STARBURST" },
-                                { label: "Corner Fold Tag (Premium 3D)", value: "CORNER_FOLD" },
-                                { label: "Folded Ribbon Tag (Premium 3D)", value: "FOLDED_RIBBON" },
+                                { label: "Glass Glow (Modern Frosted Neon)", value: "GLASS_GLOW" },
+                                { label: "Diagonal Slash (Sleek Angular Tag)", value: "DIAGONAL_SLASH" },
+                                { label: "Luxury Seal (Dashed Elite Border)", value: "LUXURY_SEAL" },
+                                { label: "Elevated 3D (Deep Shadow Floating)", value: "ELEVATED_3D" },
                               ]
                             : [
                                 { label: "Pill", value: "PILL" },
@@ -949,6 +963,9 @@ export default function SaaSAdminApp() {
                       />
 
                       <RangeSlider label={`Font size: ${formData.fontSize}px`} value={formData.fontSize} min={8} max={24} onChange={(v) => updateForm("fontSize", v)} output />
+                      <RangeSlider label={`Horizontal padding: ${formData.paddingX}px`} value={formData.paddingX} min={4} max={30} onChange={(v) => updateForm("paddingX", v)} output />
+                      <RangeSlider label={`Vertical padding: ${formData.paddingY}px`} value={formData.paddingY} min={2} max={20} onChange={(v) => updateForm("paddingY", v)} output />
+                      <RangeSlider label={`Border radius: ${formData.borderRadius}px`} value={formData.borderRadius} min={0} max={50} onChange={(v) => updateForm("borderRadius", v)} output />
                     </BlockStack>
                   </Card>
 
@@ -994,12 +1011,9 @@ export default function SaaSAdminApp() {
                           alignItems: "center",
                         }}
                       >
-                        {/* WRAPPER IS NEEDED FOR DROP-SHADOW ON CLIPPED ELEMENTS */}
-                        <div style={{ filter: isPremiumShape ? "drop-shadow(0px 4px 6px rgba(0,0,0,0.35))" : "none" }}>
-                          <div style={previewShapeStyles}>
-                            {formData.icon && <span>{formData.icon}</span>}
-                            <span>{formData.text || (modalType === "premium" ? "NEW" : "BADGE")}</span>
-                          </div>
+                        <div style={previewShapeStyles}>
+                          {formData.icon && <span>{formData.icon}</span>}
+                          <span>{formData.text || (modalType === "premium" ? "EXCLUSIVE" : "BADGE")}</span>
                         </div>
                       </Box>
                     </BlockStack>

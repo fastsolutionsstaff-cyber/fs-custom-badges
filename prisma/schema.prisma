@@ -60,6 +60,10 @@ enum BadgeShape {
   STARBURST
   CORNER_FOLD
   FOLDED_RIBBON
+  GLASS_GLOW
+  DIAGONAL_SLASH
+  LUXURY_SEAL
+  ELEVATED_3D
 }
 
 enum Position {
