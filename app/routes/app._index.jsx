@@ -45,22 +45,22 @@ const DEFAULT_FORM = {
   name: "",
   enabled: true,
 
-  text: "LIMITED STOCK",
-  icon: "⚡",
+  text: "NEW",
+  icon: "",
 
   bgColor: "#DC2626",
   textColor: "#FFFFFF",
   borderColor: "#991B1B",
 
-  shape: "PILL",
+  shape: "RIBBON_BANNER",
   position: "TOP_LEFT",
 
   fontSize: 12,
   fontWeight: "bold",
 
-  paddingX: 10,
-  paddingY: 4,
-  borderRadius: 20,
+  paddingX: 12,
+  paddingY: 6,
+  borderRadius: 4,
 
   priority: 10,
 
@@ -86,53 +86,37 @@ const DEFAULT_FORM = {
 };
 
 const PRESETS = {
-  BLACK_FRIDAY: {
-    text: "BLACK FRIDAY",
-    icon: "⚡",
-    bgColor: "#111111",
-    textColor: "#FFFFFF",
-    borderColor: "#000000",
-    shape: "PILL",
-  },
-  URGENCY: {
-    text: "ONLY FEW LEFT",
-    icon: "🚨",
+  PREMIUM_RIBBON: {
+    text: "NEW",
+    icon: "",
     bgColor: "#DC2626",
     textColor: "#FFFFFF",
     borderColor: "#991B1B",
-    shape: "PILL",
+    shape: "RIBBON_BANNER",
   },
-  MINIMAL: {
-    text: "PREMIUM",
-    icon: "✦",
-    bgColor: "#FFFFFF",
-    textColor: "#111827",
-    borderColor: "#111827",
-    shape: "OUTLINE",
-  },
-  ECO: {
-    text: "100% ORGANIC",
-    icon: "🌿",
-    bgColor: "#059669",
+  STARBURST_SEAL: {
+    text: "NEW",
+    icon: "",
+    bgColor: "#DC2626",
     textColor: "#FFFFFF",
-    borderColor: "#047857",
-    shape: "PILL",
+    borderColor: "#B91C1C",
+    shape: "STARBURST",
   },
-  HOT_SALE: {
-    text: "HOT SALE",
-    icon: "🔥",
-    bgColor: "#2563EB",
+  CORNER_TAG: {
+    text: "NEW",
+    icon: "",
+    bgColor: "#DC2626",
     textColor: "#FFFFFF",
-    borderColor: "#1D4ED8",
-    shape: "PILL",
+    borderColor: "#991B1B",
+    shape: "CORNER_FOLD",
   },
-  BEST_SELLER: {
-    text: "BEST SELLER",
-    icon: "⭐",
-    bgColor: "#111827",
+  FOLDED_BANNER: {
+    text: "NEW",
+    icon: "",
+    bgColor: "#B91C1C",
     textColor: "#FFFFFF",
-    borderColor: "#000000",
-    shape: "PILL",
+    borderColor: "#7F1D1D",
+    shape: "FOLDED_RIBBON",
   },
 };
 
@@ -151,9 +135,9 @@ function badgeToForm(badge) {
     enabled: Boolean(badge.enabled),
 
     fontSize: Number(badge.fontSize ?? 12),
-    paddingX: Number(badge.paddingX ?? 10),
-    paddingY: Number(badge.paddingY ?? 4),
-    borderRadius: Number(badge.borderRadius ?? 20),
+    paddingX: Number(badge.paddingX ?? 12),
+    paddingY: Number(badge.paddingY ?? 6),
+    borderRadius: Number(badge.borderRadius ?? 4),
     priority: Number(badge.priority ?? 0),
 
     minInventory: Number(badge.minInventory ?? 0),
@@ -251,17 +235,17 @@ export const action = async ({ request }) => {
           enabled: false,
           priority: existing.priority || 0,
           text: existing.text || "",
-          bgColor: existing.bgColor || "#111827",
+          bgColor: existing.bgColor || "#DC2626",
           textColor: existing.textColor || "#FFFFFF",
           borderColor: existing.borderColor || "#000000",
           position: existing.position || "TOP_LEFT",
-          shape: existing.shape || "PILL",
+          shape: existing.shape || "RIBBON_BANNER",
           icon: existing.icon || "",
           fontSize: existing.fontSize || 12,
           fontWeight: existing.fontWeight || "bold",
-          paddingY: existing.paddingY || 4,
-          paddingX: existing.paddingX || 10,
-          borderRadius: existing.borderRadius || 20,
+          paddingY: existing.paddingY || 6,
+          paddingX: existing.paddingX || 12,
+          borderRadius: existing.borderRadius || 4,
           customCss: existing.customCss || "",
           hideOnMobile: Boolean(existing.hideOnMobile),
           hideOnDesktop: Boolean(existing.hideOnDesktop),
@@ -301,19 +285,19 @@ export const action = async ({ request }) => {
   const id = String(formData.get("id") || "");
   const name = String(formData.get("name") || "").trim() || "Untitled Badge Campaign";
   const enabled = formData.get("enabled") === "true";
-  const text = String(formData.get("text") || "BADGE").trim();
+  const text = String(formData.get("text") || "NEW").trim();
   const icon = String(formData.get("icon") || "");
-  const bgColor = String(formData.get("bgColor") || "#111827");
+  const bgColor = String(formData.get("bgColor") || "#DC2626");
   const textColor = String(formData.get("textColor") || "#FFFFFF");
-  const borderColor = String(formData.get("borderColor") || "#000000");
+  const borderColor = String(formData.get("borderColor") || "#991B1B");
   const position = String(formData.get("position") || "TOP_LEFT");
-  const shape = String(formData.get("shape") || "PILL");
+  const shape = String(formData.get("shape") || "RIBBON_BANNER");
 
   const fontSize = parseInt(formData.get("fontSize") || "12", 10) || 12;
   const fontWeight = String(formData.get("fontWeight") || "bold");
-  const paddingX = parseInt(formData.get("paddingX") || "10", 10) || 10;
-  const paddingY = parseInt(formData.get("paddingY") || "4", 10) || 4;
-  const borderRadius = parseInt(formData.get("borderRadius") || "20", 10) || 20;
+  const paddingX = parseInt(formData.get("paddingX") || "12", 10) || 12;
+  const paddingY = parseInt(formData.get("paddingY") || "6", 10) || 6;
+  const borderRadius = parseInt(formData.get("borderRadius") || "4", 10) || 4;
   const priority = parseInt(formData.get("priority") || "0", 10) || 0;
 
   const targetType = String(formData.get("targetType") || "GLOBAL");
@@ -503,21 +487,47 @@ export default function SaaSAdminApp() {
     }
   };
 
-  const previewBadgeStyle = {
-    background: formData.shape === "OUTLINE" ? "transparent" : formData.bgColor || "#DC2626",
-    color: formData.shape === "OUTLINE" ? formData.bgColor || "#DC2626" : formData.textColor || "#FFFFFF",
+  // Dynamic preview styling for admin dashboard preview matching premium 3D styles
+  let previewShapeStyles = {
+    background: formData.bgColor || "#DC2626",
+    color: formData.textColor || "#FFFFFF",
     border: `1px solid ${formData.borderColor || formData.bgColor || "#991B1B"}`,
-    borderRadius: formData.shape === "PILL" ? "999px" : formData.shape === "SHARP" ? "0px" : `${formData.borderRadius || 20}px`,
-    padding: `${formData.paddingY || 4}px ${formData.paddingX || 10}px`,
+    borderRadius: `${formData.borderRadius || 4}px`,
+    padding: `${formData.paddingY || 6}px ${formData.paddingX || 12}px`,
     fontSize: `${formData.fontSize || 12}px`,
     fontWeight: formData.fontWeight || "bold",
     display: "inline-flex",
     alignItems: "center",
     gap: "5px",
     textTransform: "uppercase",
+    boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
   };
 
-  const safePosition = formData.position || "TOP_LEFT";
+  if (formData.shape === "RIBBON_BANNER") {
+    previewShapeStyles = {
+      ...previewShapeStyles,
+      borderRadius: "2px",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
+    };
+  } else if (formData.shape === "STARBURST") {
+    previewShapeStyles = {
+      ...previewShapeStyles,
+      borderRadius: "6px",
+      boxShadow: `0 0 0 3px ${formData.bgColor || "#DC2626"}, 0 6px 15px rgba(0,0,0,0.4)`,
+    };
+  } else if (formData.shape === "CORNER_FOLD") {
+    previewShapeStyles = {
+      ...previewShapeStyles,
+      borderRadius: "0px 4px 4px 0px",
+      boxShadow: "2px 4px 10px rgba(0,0,0,0.3)",
+    };
+  } else if (formData.shape === "FOLDED_RIBBON") {
+    previewShapeStyles = {
+      ...previewShapeStyles,
+      borderRadius: "2px",
+      boxShadow: "inset -4px 0 6px rgba(0,0,0,0.25), 0 4px 10px rgba(0,0,0,0.3)",
+    };
+  }
 
   return (
     <Page
@@ -627,10 +637,10 @@ export default function SaaSAdminApp() {
                           <IndexTable.Cell>
                             <div
                               style={{
-                                background: badge.shape === "OUTLINE" ? "transparent" : badge.bgColor,
-                                color: badge.shape === "OUTLINE" ? badge.bgColor : badge.textColor,
+                                background: badge.bgColor,
+                                color: badge.textColor,
                                 border: `1px solid ${badge.borderColor || badge.bgColor}`,
-                                borderRadius: badge.shape === "PILL" ? "999px" : badge.shape === "SHARP" ? "0px" : `${badge.borderRadius}px`,
+                                borderRadius: badge.shape === 'STARBURST' ? '6px' : '4px',
                                 padding: `4px 10px`,
                                 fontSize: `12px`,
                                 fontWeight: badge.fontWeight || "700",
@@ -638,6 +648,7 @@ export default function SaaSAdminApp() {
                                 alignItems: "center",
                                 gap: "4px",
                                 whiteSpace: "nowrap",
+                                boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
                               }}
                             >
                               {badge.icon && <span>{badge.icon}</span>}
@@ -755,14 +766,12 @@ export default function SaaSAdminApp() {
 
                   <Card padding="400">
                     <BlockStack gap="300">
-                      <Text variant="headingMd">Quick styles</Text>
+                      <Text variant="headingMd">Premium 3D Badge Presets</Text>
                       <InlineStack gap="200" wrap>
-                        <Button onClick={() => handleApplyPreset("BLACK_FRIDAY")}>Black Friday</Button>
-                        <Button onClick={() => handleApplyPreset("URGENCY")}>Urgency</Button>
-                        <Button onClick={() => handleApplyPreset("MINIMAL")}>Minimal</Button>
-                        <Button onClick={() => handleApplyPreset("ECO")}>Eco</Button>
-                        <Button onClick={() => handleApplyPreset("HOT_SALE")}>Hot Sale</Button>
-                        <Button onClick={() => handleApplyPreset("BEST_SELLER")}>Best Seller</Button>
+                        <Button onClick={() => handleApplyPreset("PREMIUM_RIBBON")}>Ribbon Banner</Button>
+                        <Button onClick={() => handleApplyPreset("STARBURST_SEAL")}>Starburst Seal</Button>
+                        <Button onClick={() => handleApplyPreset("CORNER_TAG")}>Corner Tag</Button>
+                        <Button onClick={() => handleApplyPreset("FOLDED_BANNER")}>Folded Ribbon</Button>
                       </InlineStack>
                     </BlockStack>
                   </Card>
@@ -784,7 +793,7 @@ export default function SaaSAdminApp() {
 
                   <Card padding="400">
                     <BlockStack gap="400">
-                      <Text variant="headingMd">Appearance</Text>
+                      <Text variant="headingMd">Appearance & Premium Shapes</Text>
                       <Grid>
                         <Grid.Cell columnSpan={{ xs: 4, sm: 4, md: 4, lg: 4, xl: 4 }}>
                           <TextField label="Background" type="color" value={formData.bgColor} onChange={(v) => updateForm("bgColor", v)} />
@@ -798,10 +807,14 @@ export default function SaaSAdminApp() {
                       </Grid>
 
                       <Select
-                        label="Shape"
+                        label="Badge Shape Style"
                         options={[
-                          { label: "Pill", value: "PILL" },
-                          { label: "Sharp", value: "SHARP" },
+                          { label: "Ribbon Banner (3D Red)", value: "RIBBON_BANNER" },
+                          { label: "Starburst Seal", value: "STARBURST" },
+                          { label: "Corner Fold Tag", value: "CORNER_FOLD" },
+                          { label: "Folded Ribbon Tag", value: "FOLDED_RIBBON" },
+                          { label: "Classic Pill", value: "PILL" },
+                          { label: "Sharp Box", value: "SHARP" },
                           { label: "Outline", value: "OUTLINE" },
                           { label: "Glassmorphism", value: "GLASSMORPHISM" },
                         ]}
@@ -855,9 +868,9 @@ export default function SaaSAdminApp() {
                           alignItems: "center",
                         }}
                       >
-                        <div style={previewBadgeStyle}>
+                        <div style={previewShapeStyles}>
                           {formData.icon && <span>{formData.icon}</span>}
-                          <span>{formData.text || "BADGE"}</span>
+                          <span>{formData.text || "NEW"}</span>
                         </div>
                       </Box>
                     </BlockStack>
