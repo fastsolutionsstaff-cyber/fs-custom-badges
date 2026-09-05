@@ -1,70 +1,23 @@
-<div id="fs-custom-badge-{{ block.id }}" class="fs-badge-container">
-  {% if block.settings.use_dashboard == false %}
-    <!-- Manual Customization via Theme Editor -->
-    <div style="
-      background: {{ block.settings.bg_color }};
-      color: {{ block.settings.text_color }};
-      border: 1px solid {{ block.settings.border_color }};
-      border-radius: {{ block.settings.border_radius }}px;
-      padding: 6px 12px;
-      font-size: {{ block.settings.font_size }}px;
-      font-weight: bold;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    ">
-      <span>{{ block.settings.custom_text }}</span>
-    </div>
-  {% endif %}
+<div class="fs-badge-container" {{ block.shopify_attributes }}>
+  <div style="
+    background: {% if block.settings.shape == 'OUTLINE' %}transparent{% else %}{{ block.settings.bg_color }}{% endif %};
+    color: {% if block.settings.shape == 'OUTLINE' %}{{ block.settings.bg_color }}{% else %}{{ block.settings.text_color }}{% endif %};
+    border: 1px solid {{ block.settings.border_color | default: block.settings.bg_color }};
+    border-radius: {% if block.settings.shape == 'PILL' %}999px{% elsif block.settings.shape == 'SHARP' %}0px{% else %}{{ block.settings.border_radius }}px{% endif %};
+    padding: {{ block.settings.padding_y }}px {{ block.settings.padding_x }}px;
+    font-size: {{ block.settings.font_size }}px;
+    font-weight: {{ block.settings.font_weight }};
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    text-transform: uppercase;
+  ">
+    {% if block.settings.icon != blank %}
+      <span>{{ block.settings.icon }}</span>
+    {% endif %}
+    <span>{{ block.settings.custom_text }}</span>
+  </div>
 </div>
-
-{% if block.settings.use_dashboard %}
-<script>
-  document.addEventListener("DOMContentLoaded", async function() {
-    const container = document.getElementById("fs-custom-badge-{{ block.id }}");
-    const shopDomain = Shopify.shop || "{{ shop.permanent_domain }}";
-    const productId = "{{ product.id }}";
-    
-    // Fetch specifically for this product
-    const apiUrl = `/apps/badges?shop=${shopDomain}&productId=${productId}`;
-
-    try {
-      const response = await fetch(apiUrl);
-      const data = await response.json();
-
-      if (data.success && data.badges && data.badges.length > 0) {
-        const badge = data.badges[0]; // Load highest priority badge for this product
-        
-        const bg = badge.shape === 'OUTLINE' ? 'transparent' : badge.bgColor;
-        const color = badge.shape === 'OUTLINE' ? badge.bgColor : badge.textColor;
-        const border = `1px solid ${badge.borderColor || badge.bgColor}`;
-        const radius = badge.shape === 'PILL' ? '999px' : (badge.shape === 'SHARP' ? '0px' : badge.borderRadius + 'px');
-
-        container.innerHTML = `
-          <div style="
-            background: ${bg};
-            color: ${color};
-            border: ${border};
-            border-radius: ${radius};
-            padding: ${badge.paddingY}px ${badge.paddingX}px;
-            font-size: ${badge.fontSize}px;
-            font-weight: ${badge.fontWeight};
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            ${badge.customCss}
-          ">
-            ${badge.icon ? `<span>${badge.icon}</span>` : ''}
-            <span>${badge.text}</span>
-          </div>
-        `;
-      }
-    } catch (error) {
-      console.error("FS Custom Badges Fetch Error:", error);
-    }
-  });
-</script>
-{% endif %}
 
 {% schema %}
 {
@@ -73,21 +26,27 @@
   "templates": ["product"],
   "settings": [
     {
-      "type": "checkbox",
-      "id": "use_dashboard",
-      "label": "Use App Dashboard Settings",
-      "default": true,
-      "info": "If checked, it fetches settings automatically from your app."
-    },
-    {
-      "type": "header",
-      "content": "Manual Settings (If Dashboard is off)"
-    },
-    {
       "type": "text",
       "id": "custom_text",
       "label": "Badge Text",
       "default": "HOT SELLER"
+    },
+    {
+      "type": "text",
+      "id": "icon",
+      "label": "Icon",
+      "default": "🔥"
+    },
+    {
+      "type": "select",
+      "id": "shape",
+      "label": "Shape",
+      "options": [
+        { "label": "Pill", "value": "PILL" },
+        { "label": "Sharp", "value": "SHARP" },
+        { "label": "Outline", "value": "OUTLINE" }
+      ],
+      "default": "PILL"
     },
     {
       "type": "color",
@@ -124,6 +83,36 @@
       "step": 1,
       "label": "Font Size",
       "default": 13
+    },
+    {
+      "type": "select",
+      "id": "font_weight",
+      "label": "Font Weight",
+      "options": [
+        { "label": "Regular", "value": "400" },
+        { "label": "Medium", "value": "500" },
+        { "label": "Bold", "value": "bold" },
+        { "label": "Extra Bold", "value": "800" }
+      ],
+      "default": "bold"
+    },
+    {
+      "type": "range",
+      "id": "padding_x",
+      "min": 4,
+      "max": 30,
+      "step": 1,
+      "label": "Horizontal Padding",
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "padding_y",
+      "min": 2,
+      "max": 16,
+      "step": 1,
+      "label": "Vertical Padding",
+      "default": 4
     }
   ]
 }
