@@ -1,7 +1,9 @@
 {% unless request.page_type == 'product' %}
 <script>
   document.addEventListener("DOMContentLoaded", async function() {
-    // Apki app proxy ka URL
+    // CRITICAL FIX: Strictly prevent this script from running on product pages
+    if (window.location.pathname.includes('/products/')) return;
+
     const shopDomain = Shopify.shop || "{{ shop.permanent_domain }}";
     const apiUrl = `/apps/badges?shop=${shopDomain}`;
 
@@ -18,27 +20,38 @@
           document.head.appendChild(style);
         }
 
-        // 2. Theme Customizer Selector (Default for Dawn and similar themes)
+        // 2. Theme Customizer Selector
         const cardSelector = "{{ block.settings.card_selector }}";
         const productCards = document.querySelectorAll(cardSelector);
 
         productCards.forEach(card => {
-          // Extract product ID or handle from card
           const productLink = card.querySelector('a[href*="/products/"]');
           if (!productLink) return;
 
-          // Badges ko filter aur inject karne ka logic
-          const globalBadges = data.badges.filter(b => b.isGlobal);
+          // Attempt to pull product ID if the theme supports it for specific badge targeting
+          const cardProductId = card.getAttribute('data-product-id') || 
+                               (card.querySelector('[data-product-id]') ? card.querySelector('[data-product-id]').getAttribute('data-product-id') : null);
+
+          let activeBadge = null;
+
+          // Check if a specific product badge exists for this card first
+          if (cardProductId) {
+            activeBadge = data.badges.find(b => b.targetType === 'SPECIFIC_PRODUCTS' && b.productIds.includes(String(cardProductId)));
+          }
+
+          // Fallback to highest priority global badge
+          if (!activeBadge) {
+            activeBadge = data.badges.find(b => b.isGlobal || b.targetType === 'GLOBAL');
+          }
           
-          if (globalBadges.length > 0) {
-            const badge = globalBadges[0]; // Highest priority badge
+          if (activeBadge) {
             const badgeElement = document.createElement('div');
             
             // Apply Database Styles
-            const bg = badge.shape === 'OUTLINE' ? 'transparent' : badge.bgColor;
-            const color = badge.shape === 'OUTLINE' ? badge.bgColor : badge.textColor;
-            const border = `1px solid ${badge.borderColor || badge.bgColor}`;
-            const radius = badge.shape === 'PILL' ? '999px' : (badge.shape === 'SHARP' ? '0px' : badge.borderRadius + 'px');
+            const bg = activeBadge.shape === 'OUTLINE' ? 'transparent' : activeBadge.bgColor;
+            const color = activeBadge.shape === 'OUTLINE' ? activeBadge.bgColor : activeBadge.textColor;
+            const border = `1px solid ${activeBadge.borderColor || activeBadge.bgColor}`;
+            const radius = activeBadge.shape === 'PILL' ? '999px' : (activeBadge.shape === 'SHARP' ? '0px' : activeBadge.borderRadius + 'px');
             
             badgeElement.style.cssText = `
               position: absolute;
@@ -49,16 +62,16 @@
               color: ${color};
               border: ${border};
               border-radius: ${radius};
-              padding: ${badge.paddingY}px ${badge.paddingX}px;
-              font-size: ${badge.fontSize}px;
-              font-weight: ${badge.fontWeight};
+              padding: ${activeBadge.paddingY}px ${activeBadge.paddingX}px;
+              font-size: ${activeBadge.fontSize}px;
+              font-weight: ${activeBadge.fontWeight};
               display: inline-flex;
               align-items: center;
               gap: 4px;
-              ${badge.customCss}
+              ${activeBadge.customCss}
             `;
             
-            badgeElement.innerHTML = `${badge.icon ? `<span>${badge.icon}</span>` : ''} <span>${badge.text}</span>`;
+            badgeElement.innerHTML = `${activeBadge.icon ? `<span>${activeBadge.icon}</span>` : ''} <span>${activeBadge.text}</span>`;
             
             card.style.position = 'relative'; // Ensure parent is relative
             card.appendChild(badgeElement);

@@ -24,7 +24,7 @@ export const loader = async ({ request }) => {
 
   const now = new Date();
 
-  // Active / Enabled badges fetch kar rahe hain
+  // Active / Enabled badges fetch
   const badges = await db.badge.findMany({
     where: {
       shop,
@@ -68,7 +68,7 @@ export const loader = async ({ request }) => {
     };
   });
 
-  // Agar specific single product PDP route par request aayi ho
+  // Filter and prioritize if specific single product PDP route requested
   let filteredBadges = formattedBadges;
   if (rawProductId) {
     const cleanId = cleanProductId(rawProductId);
@@ -78,6 +78,13 @@ export const loader = async ({ request }) => {
         return badge.productIds.includes(cleanId);
       }
       return true;
+    });
+
+    // CRITICAL FIX: Force SPECIFIC_PRODUCTS to override GLOBAL for this specific product
+    filteredBadges.sort((a, b) => {
+      if (a.targetType === "SPECIFIC_PRODUCTS" && b.targetType !== "SPECIFIC_PRODUCTS") return -1;
+      if (b.targetType === "SPECIFIC_PRODUCTS" && a.targetType !== "SPECIFIC_PRODUCTS") return 1;
+      return 0; // Maintain existing priority for identical target types
     });
   }
 
