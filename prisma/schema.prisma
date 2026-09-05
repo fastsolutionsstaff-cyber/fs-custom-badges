@@ -71,9 +71,8 @@ model Badge {
   shop      String
   name      String   @default("Conversion Campaign")
   enabled   Boolean  @default(true)
-  priority  Int      @default(0) // Higher number = higher display priority
+  priority  Int      @default(0)
 
-  // Design & Typography
   text         String     @default("BESTSELLER")
   bgColor      String     @default("#DC2626")
   textColor    String     @default("#FFFFFF")
@@ -88,30 +87,25 @@ model Badge {
   borderRadius Int        @default(20)
   customCss    String?    @default("")
 
-  // Device Visibility Controls
   hideOnMobile  Boolean @default(false)
   hideOnDesktop Boolean @default(false)
 
-  // Advanced Rules & Targeting Engine
   targetType       TargetType @default(GLOBAL)
-  targetTags       String?    @default("") // Comma-separated tags
-  targetCollection String?    @default("") // Collection GID or Handles
+  targetTags       String?    @default("")
+  targetCollection String?    @default("")
   minInventory     Int?       @default(0)
   maxInventory     Int?       @default(9999)
   minPrice         Float?     @default(0.00)
   maxPrice         Float?     @default(99999.00)
 
-  // Scheduling & Expirations
   startDate DateTime?
   endDate   DateTime?
 
-  // Performance & Aggregate Tracking
   impressions       Int   @default(0)
   clicks            Int   @default(0)
   conversions       Int   @default(0)
   revenueGenerated  Float @default(0.00)
 
-  // Relations
   products      BadgeProduct[]
   collections   BadgeCollection[]
   analyticsLogs AnalyticsLog[]
@@ -124,14 +118,16 @@ model Badge {
 }
 
 model BadgeProduct {
-  id        String @id @default(uuid())
-  badgeId   String
-  productId String // Cleaned numeric ID or GID
+  id            String  @id @default(uuid())
+  badgeId       String
+  productId     String
+  productHandle String?
 
   badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
 
   @@unique([badgeId, productId])
-  @@index([productId]) // Fast lookup when searching by Product
+  @@index([productId])
+  @@index([productHandle])
 }
 
 model BadgeCollection {
@@ -147,9 +143,9 @@ model BadgeCollection {
 
 model AnalyticsLog {
   id        String   @id @default(uuid())
-  shop      String   // Added for fast shop-level analytics filtering
+  shop      String
   badgeId   String
-  eventType String   // IMPRESSION, CLICK, CONVERSION
+  eventType String
   timestamp DateTime @default(now())
 
   badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)

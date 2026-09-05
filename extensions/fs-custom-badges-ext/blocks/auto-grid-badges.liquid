@@ -1,7 +1,6 @@
 {% unless request.page_type == 'product' %}
 <script>
   document.addEventListener("DOMContentLoaded", async function() {
-    // CRITICAL FIX: Strictly prevent this script from running on product pages
     if (window.location.pathname.includes('/products/')) return;
 
     const shopDomain = Shopify.shop || "{{ shop.permanent_domain }}";
@@ -12,15 +11,12 @@
       const data = await response.json();
 
       if (data.success && data.badges && data.badges.length > 0) {
-        
-        // 1. Inject Global Custom CSS
         if (data.globalCustomCss) {
           const style = document.createElement('style');
           style.innerHTML = data.globalCustomCss;
           document.head.appendChild(style);
         }
 
-        // 2. Theme Customizer Selector
         const cardSelector = "{{ block.settings.card_selector }}";
         const productCards = document.querySelectorAll(cardSelector);
 
@@ -28,18 +24,19 @@
           const productLink = card.querySelector('a[href*="/products/"]');
           if (!productLink) return;
 
-          // Attempt to pull product ID if the theme supports it for specific badge targeting
-          const cardProductId = card.getAttribute('data-product-id') || 
-                               (card.querySelector('[data-product-id]') ? card.querySelector('[data-product-id]').getAttribute('data-product-id') : null);
+          // Extract product handle directly from card URL path
+          const urlPath = new URL(productLink.href, window.location.origin).pathname;
+          const pathParts = urlPath.split('/products/');
+          const productHandle = pathParts.length > 1 ? pathParts[1].split('?')[0].split('/')[0] : '';
 
           let activeBadge = null;
 
-          // Check if a specific product badge exists for this card first
-          if (cardProductId) {
-            activeBadge = data.badges.find(b => b.targetType === 'SPECIFIC_PRODUCTS' && b.productIds.includes(String(cardProductId)));
+          // Match specific product badge by handle
+          if (productHandle) {
+            activeBadge = data.badges.find(b => b.targetType === 'SPECIFIC_PRODUCTS' && b.productHandles && b.productHandles.includes(productHandle));
           }
 
-          // Fallback to highest priority global badge
+          // Fallback to global badge
           if (!activeBadge) {
             activeBadge = data.badges.find(b => b.isGlobal || b.targetType === 'GLOBAL');
           }
@@ -47,7 +44,6 @@
           if (activeBadge) {
             const badgeElement = document.createElement('div');
             
-            // Apply Database Styles
             const bg = activeBadge.shape === 'OUTLINE' ? 'transparent' : activeBadge.bgColor;
             const color = activeBadge.shape === 'OUTLINE' ? activeBadge.bgColor : activeBadge.textColor;
             const border = `1px solid ${activeBadge.borderColor || activeBadge.bgColor}`;
@@ -73,7 +69,7 @@
             
             badgeElement.innerHTML = `${activeBadge.icon ? `<span>${activeBadge.icon}</span>` : ''} <span>${activeBadge.text}</span>`;
             
-            card.style.position = 'relative'; // Ensure parent is relative
+            card.style.position = 'relative';
             card.appendChild(badgeElement);
           }
         });

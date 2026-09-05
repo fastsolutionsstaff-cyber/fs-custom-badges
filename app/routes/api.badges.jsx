@@ -1,5 +1,5 @@
 import { json } from "@remix-run/node";
-import db from "../db.server"; // Adjust path according to your db connection file
+import db from "../db.server";
 
 function cleanProductId(id) {
   if (!id) return "";
@@ -24,7 +24,6 @@ export const loader = async ({ request }) => {
 
   const now = new Date();
 
-  // Active / Enabled badges fetch
   const badges = await db.badge.findMany({
     where: {
       shop,
@@ -43,6 +42,7 @@ export const loader = async ({ request }) => {
 
   const formattedBadges = badges.map((b) => {
     const productIds = b.products ? b.products.map((p) => cleanProductId(p.productId)) : [];
+    const productHandles = b.products ? b.products.map((p) => p.productHandle).filter(Boolean) : [];
     
     return {
       id: b.id,
@@ -63,12 +63,12 @@ export const loader = async ({ request }) => {
       priority: b.priority,
       targetType: b.targetType,
       productIds: productIds,
+      productHandles: productHandles,
       isGlobal: b.targetType === "GLOBAL",
       customCss: b.customCss || ""
     };
   });
 
-  // Filter and prioritize if specific single product PDP route requested
   let filteredBadges = formattedBadges;
   if (rawProductId) {
     const cleanId = cleanProductId(rawProductId);
@@ -80,11 +80,10 @@ export const loader = async ({ request }) => {
       return true;
     });
 
-    // CRITICAL FIX: Force SPECIFIC_PRODUCTS to override GLOBAL for this specific product
     filteredBadges.sort((a, b) => {
       if (a.targetType === "SPECIFIC_PRODUCTS" && b.targetType !== "SPECIFIC_PRODUCTS") return -1;
       if (b.targetType === "SPECIFIC_PRODUCTS" && a.targetType !== "SPECIFIC_PRODUCTS") return 1;
-      return 0; // Maintain existing priority for identical target types
+      return 0;
     });
   }
 
