@@ -85,7 +85,7 @@ const DEFAULT_FORM = {
   products: [],
 };
 
-const PRESETS = {
+const STANDARD_PRESETS = {
   BLACK_FRIDAY: {
     text: "BLACK FRIDAY",
     icon: "⚡",
@@ -134,6 +134,9 @@ const PRESETS = {
     borderColor: "#000000",
     shape: "PILL",
   },
+};
+
+const PREMIUM_PRESETS = {
   PREMIUM_RIBBON: {
     text: "NEW",
     icon: "",
@@ -141,6 +144,9 @@ const PRESETS = {
     textColor: "#FFFFFF",
     borderColor: "#991B1B",
     shape: "RIBBON_BANNER",
+    paddingX: 12,
+    paddingY: 6,
+    borderRadius: 2,
   },
   STARBURST_SEAL: {
     text: "NEW",
@@ -149,6 +155,9 @@ const PRESETS = {
     textColor: "#FFFFFF",
     borderColor: "#B91C1C",
     shape: "STARBURST",
+    paddingX: 12,
+    paddingY: 6,
+    borderRadius: 6,
   },
   CORNER_TAG: {
     text: "NEW",
@@ -157,6 +166,9 @@ const PRESETS = {
     textColor: "#FFFFFF",
     borderColor: "#991B1B",
     shape: "CORNER_FOLD",
+    paddingX: 12,
+    paddingY: 6,
+    borderRadius: 4,
   },
   FOLDED_RIBBON: {
     text: "NEW",
@@ -165,6 +177,9 @@ const PRESETS = {
     textColor: "#FFFFFF",
     borderColor: "#7F1D1D",
     shape: "FOLDED_RIBBON",
+    paddingX: 12,
+    paddingY: 6,
+    borderRadius: 2,
   },
 };
 
@@ -438,6 +453,7 @@ export default function SaaSAdminApp() {
 
   const [selectedTab, setSelectedTab] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
+  const [modalType, setModalType] = useState("standard"); // "standard" or "premium"
   const [globalCssState, setGlobalCssState] = useState(settings?.globalCustomCss || "");
   const [formData, setFormData] = useState(DEFAULT_FORM);
   const [previewTheme, setPreviewTheme] = useState("light");
@@ -448,14 +464,21 @@ export default function SaaSAdminApp() {
   const activeBadges = useMemo(() => badges.filter((b) => b.enabled), [badges]);
   const disabledBadges = useMemo(() => badges.filter((b) => !b.enabled), [badges]);
 
-  const handleOpenModal = (badge = null) => {
+  const handleOpenModal = (type = "standard", badge = null) => {
+    setModalType(type);
     if (badge) {
       setFormData(badgeToForm(badge));
+      // determine if existing badge is premium or standard based on shape
+      const isPrem = ["RIBBON_BANNER", "STARBURST", "CORNER_FOLD", "FOLDED_RIBBON"].includes(badge.shape);
+      setModalType(isPrem ? "premium" : "standard");
     } else {
       setFormData({
         ...DEFAULT_FORM,
         id: "new",
-        name: `Badge Campaign #${badges.length + 1}`,
+        name: type === "premium" ? `Premium Badge #${badges.length + 1}` : `Badge Campaign #${badges.length + 1}`,
+        shape: type === "premium" ? "RIBBON_BANNER" : "PILL",
+        text: type === "premium" ? "NEW" : "LIMITED STOCK",
+        icon: type === "premium" ? "" : "⚡",
       });
     }
     setShowAdvanced(false);
@@ -467,7 +490,7 @@ export default function SaaSAdminApp() {
   };
 
   const handleApplyPreset = (presetKey) => {
-    const preset = PRESETS[presetKey];
+    const preset = modalType === "premium" ? PREMIUM_PRESETS[presetKey] : STANDARD_PRESETS[presetKey];
     if (!preset) return;
     setFormData((prev) => ({ ...prev, ...preset }));
   };
@@ -579,7 +602,18 @@ export default function SaaSAdminApp() {
     <Page
       title="Badge Studio"
       subtitle="Create, control and optimize storefront product badges."
-      primaryAction={{ content: "Create badge", icon: PlusIcon, onAction: () => handleOpenModal() }}
+      primaryAction={{
+        content: "Create badge",
+        icon: PlusIcon,
+        onAction: () => handleOpenModal("standard"),
+      }}
+      secondaryActions={[
+        {
+          content: "Create premium badge",
+          icon: PlusIcon,
+          onAction: () => handleOpenModal("premium"),
+        },
+      ]}
     >
       <BlockStack gap="500">
         {actionData?.message && (
@@ -646,9 +680,20 @@ export default function SaaSAdminApp() {
                     <Text variant="headingMd">Badge campaigns</Text>
                     <Text variant="bodySm" tone="subdued">Manage every badge displayed on your storefront.</Text>
                   </BlockStack>
-                  <Button variant="primary" icon={PlusIcon} onClick={() => handleOpenModal()}>
-                    Create badge
-                  </Button>
+                  <InlineStack gap="300">
+                    <Button
+                      onClick={() => handleOpenModal("premium")}
+                    >
+                      Create premium badge
+                    </Button>
+                    <Button
+                      variant="primary"
+                      icon={PlusIcon}
+                      onClick={() => handleOpenModal("standard")}
+                    >
+                      Create badge
+                    </Button>
+                  </InlineStack>
                 </InlineStack>
 
                 <Divider />
@@ -656,7 +701,7 @@ export default function SaaSAdminApp() {
                 {badges.length === 0 ? (
                   <EmptyState
                     heading="Create your first badge"
-                    action={{ content: "Create badge", onAction: () => handleOpenModal() }}
+                    action={{ content: "Create badge", onAction: () => handleOpenModal("standard") }}
                     image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
                   >
                     <p>Create a product badge and publish it to your Shopify storefront.</p>
@@ -735,7 +780,7 @@ export default function SaaSAdminApp() {
                           <IndexTable.Cell>
                             <InlineStack gap="100">
                               <Tooltip content="Edit badge">
-                                <Button icon={EditIcon} size="micro" onClick={() => handleOpenModal(badge)} />
+                                <Button icon={EditIcon} size="micro" onClick={() => handleOpenModal(modalType, badge)} />
                               </Tooltip>
                               <Tooltip content="Duplicate badge">
                                 <Button icon={DuplicateIcon} size="micro" onClick={() => handleDuplicate(badge.id)} />
@@ -793,7 +838,13 @@ export default function SaaSAdminApp() {
         <Modal
           open={modalOpen}
           onClose={() => setModalOpen(false)}
-          title={formData.id === "new" ? "Create badge campaign" : `Edit ${formData.name}`}
+          title={
+            formData.id !== "new"
+              ? `Edit ${formData.name}`
+              : modalType === "premium"
+              ? "Create premium badge"
+              : "Create badge campaign"
+          }
           primaryAction={{ content: formData.enabled ? "Save & publish" : "Save as disabled", onAction: handleSaveForm, loading: isSaving }}
           secondaryActions={[{ content: "Cancel", onAction: () => setModalOpen(false) }]}
           size="large"
@@ -811,18 +862,27 @@ export default function SaaSAdminApp() {
 
                   <Card padding="400">
                     <BlockStack gap="300">
-                      <Text variant="headingMd">Quick styles & Premium 3D Badges</Text>
+                      <Text variant="headingMd">
+                        {modalType === "premium" ? "Premium 3D Badge Presets" : "Quick styles"}
+                      </Text>
                       <InlineStack gap="200" wrap>
-                        <Button onClick={() => handleApplyPreset("BLACK_FRIDAY")}>Black Friday</Button>
-                        <Button onClick={() => handleApplyPreset("URGENCY")}>Urgency</Button>
-                        <Button onClick={() => handleApplyPreset("MINIMAL")}>Minimal</Button>
-                        <Button onClick={() => handleApplyPreset("ECO")}>Eco</Button>
-                        <Button onClick={() => handleApplyPreset("HOT_SALE")}>Hot Sale</Button>
-                        <Button onClick={() => handleApplyPreset("BEST_SELLER")}>Best Seller</Button>
-                        <Button onClick={() => handleApplyPreset("PREMIUM_RIBBON")}>Ribbon Banner</Button>
-                        <Button onClick={() => handleApplyPreset("STARBURST_SEAL")}>Starburst Seal</Button>
-                        <Button onClick={() => handleApplyPreset("CORNER_TAG")}>Corner Tag</Button>
-                        <Button onClick={() => handleApplyPreset("FOLDED_RIBBON")}>Folded Ribbon</Button>
+                        {modalType === "premium" ? (
+                          <>
+                            <Button onClick={() => handleApplyPreset("PREMIUM_RIBBON")}>Ribbon Banner</Button>
+                            <Button onClick={() => handleApplyPreset("STARBURST_SEAL")}>Starburst Seal</Button>
+                            <Button onClick={() => handleApplyPreset("CORNER_TAG")}>Corner Tag</Button>
+                            <Button onClick={() => handleApplyPreset("FOLDED_RIBBON")}>Folded Ribbon</Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button onClick={() => handleApplyPreset("BLACK_FRIDAY")}>Black Friday</Button>
+                            <Button onClick={() => handleApplyPreset("URGENCY")}>Urgency</Button>
+                            <Button onClick={() => handleApplyPreset("MINIMAL")}>Minimal</Button>
+                            <Button onClick={() => handleApplyPreset("ECO")}>Eco</Button>
+                            <Button onClick={() => handleApplyPreset("HOT_SALE")}>Hot Sale</Button>
+                            <Button onClick={() => handleApplyPreset("BEST_SELLER")}>Best Seller</Button>
+                          </>
+                        )}
                       </InlineStack>
                     </BlockStack>
                   </Card>
@@ -832,12 +892,14 @@ export default function SaaSAdminApp() {
                       <Text variant="headingMd">Badge content</Text>
                       <TextField label="Internal name" value={formData.name} onChange={(v) => updateForm("name", v)} autoComplete="off" />
                       <Grid>
-                        <Grid.Cell columnSpan={{ xs: 8, sm: 8, md: 8, lg: 8, xl: 8 }}>
+                        <Grid.Cell columnSpan={{ xs: modalType === "premium" ? 12 : 8, sm: modalType === "premium" ? 12 : 8, md: modalType === "premium" ? 12 : 8, lg: modalType === "premium" ? 12 : 8, xl: modalType === "premium" ? 12 : 8 }}>
                           <TextField label="Badge text" value={formData.text} onChange={(v) => updateForm("text", v)} autoComplete="off" />
                         </Grid.Cell>
-                        <Grid.Cell columnSpan={{ xs: 4, sm: 4, md: 4, lg: 4, xl: 4 }}>
-                          <TextField label="Icon" value={formData.icon} onChange={(v) => updateForm("icon", v)} autoComplete="off" />
-                        </Grid.Cell>
+                        {modalType !== "premium" && (
+                          <Grid.Cell columnSpan={{ xs: 4, sm: 4, md: 4, lg: 4, xl: 4 }}>
+                            <TextField label="Icon" value={formData.icon} onChange={(v) => updateForm("icon", v)} autoComplete="off" />
+                          </Grid.Cell>
+                        )}
                       </Grid>
                     </BlockStack>
                   </Card>
@@ -859,16 +921,21 @@ export default function SaaSAdminApp() {
 
                       <Select
                         label="Shape Style"
-                        options={[
-                          { label: "Pill", value: "PILL" },
-                          { label: "Sharp", value: "SHARP" },
-                          { label: "Outline", value: "OUTLINE" },
-                          { label: "Glassmorphism", value: "GLASSMORPHISM" },
-                          { label: "Ribbon Banner (Premium 3D)", value: "RIBBON_BANNER" },
-                          { label: "Starburst Seal (Premium 3D)", value: "STARBURST" },
-                          { label: "Corner Fold Tag (Premium 3D)", value: "CORNER_FOLD" },
-                          { label: "Folded Ribbon Tag (Premium 3D)", value: "FOLDED_RIBBON" },
-                        ]}
+                        options={
+                          modalType === "premium"
+                            ? [
+                                { label: "Ribbon Banner (Premium 3D)", value: "RIBBON_BANNER" },
+                                { label: "Starburst Seal (Premium 3D)", value: "STARBURST" },
+                                { label: "Corner Fold Tag (Premium 3D)", value: "CORNER_FOLD" },
+                                { label: "Folded Ribbon Tag (Premium 3D)", value: "FOLDED_RIBBON" },
+                              ]
+                            : [
+                                { label: "Pill", value: "PILL" },
+                                { label: "Sharp", value: "SHARP" },
+                                { label: "Outline", value: "OUTLINE" },
+                                { label: "Glassmorphism", value: "GLASSMORPHISM" },
+                              ]
+                        }
                         value={formData.shape}
                         onChange={(v) => updateForm("shape", v)}
                       />
@@ -921,7 +988,7 @@ export default function SaaSAdminApp() {
                       >
                         <div style={previewShapeStyles}>
                           {formData.icon && <span>{formData.icon}</span>}
-                          <span>{formData.text || "BADGE"}</span>
+                          <span>{formData.text || (modalType === "premium" ? "NEW" : "BADGE")}</span>
                         </div>
                       </Box>
                     </BlockStack>
