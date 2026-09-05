@@ -137,49 +137,49 @@ const STANDARD_PRESETS = {
 };
 
 const PREMIUM_PRESETS = {
-  GLASS_GLOW: {
-    text: "EXCLUSIVE",
-    icon: "✨",
-    bgColor: "#1E1B4B",
-    textColor: "#C084FC",
-    borderColor: "#7C3AED",
-    shape: "GLASS_GLOW",
-    paddingX: 14,
-    paddingY: 6,
-    borderRadius: 12,
-  },
-  DIAGONAL_SLASH: {
-    text: "HOT DEAL",
-    icon: "⚡",
-    bgColor: "#DC2626",
+  SHIELD_RIBBON: {
+    text: "BEST",
+    icon: "★",
+    bgColor: "#EAB308",
     textColor: "#FFFFFF",
-    borderColor: "#991B1B",
-    shape: "DIAGONAL_SLASH",
-    paddingX: 14,
-    paddingY: 6,
-    borderRadius: 4,
+    borderColor: "#CA8A04",
+    shape: "SHIELD_RIBBON",
+    paddingX: 16,
+    paddingY: 8,
+    borderRadius: 8,
   },
-  LUXURY_SEAL: {
-    text: "LUXURY",
+  CIRCLE_RIBBON: {
+    text: "NEW",
     icon: "👑",
-    bgColor: "#78350F",
-    textColor: "#FDE68A",
-    borderColor: "#F59E0B",
-    shape: "LUXURY_SEAL",
+    bgColor: "#3B82F6",
+    textColor: "#FFFFFF",
+    borderColor: "#1D4ED8",
+    shape: "CIRCLE_RIBBON",
     paddingX: 16,
     paddingY: 8,
     borderRadius: 999,
   },
-  ELEVATED_3D: {
-    text: "LIMITED",
+  BADGE_SHIELD: {
+    text: "SALE",
     icon: "🔥",
-    bgColor: "#065F46",
-    textColor: "#A7F3D0",
+    bgColor: "#EF4444",
+    textColor: "#FFFFFF",
+    borderColor: "#B91C1C",
+    shape: "BADGE_SHIELD",
+    paddingX: 16,
+    paddingY: 8,
+    borderRadius: 12,
+  },
+  ROUND_BANNER: {
+    text: "TOP",
+    icon: "💎",
+    bgColor: "#10B981",
+    textColor: "#FFFFFF",
     borderColor: "#047857",
-    shape: "ELEVATED_3D",
-    paddingX: 14,
-    paddingY: 6,
-    borderRadius: 8,
+    shape: "ROUND_BANNER",
+    paddingX: 16,
+    paddingY: 8,
+    borderRadius: 12,
   },
 };
 
@@ -466,16 +466,16 @@ export default function SaaSAdminApp() {
     setModalType(type);
     if (badge) {
       setFormData(badgeToForm(badge));
-      const isPrem = ["GLASS_GLOW", "DIAGONAL_SLASH", "LUXURY_SEAL", "ELEVATED_3D"].includes(badge.shape);
+      const isPrem = ["SHIELD_RIBBON", "CIRCLE_RIBBON", "BADGE_SHIELD", "ROUND_BANNER"].includes(badge.shape);
       setModalType(isPrem ? "premium" : "standard");
     } else {
       setFormData({
         ...DEFAULT_FORM,
         id: "new",
-        name: type === "premium" ? `Premium Badge #${badges.length + 1}` : `Badge Campaign #${badges.length + 1}`,
-        shape: type === "premium" ? "GLASS_GLOW" : "PILL",
-        text: type === "premium" ? "EXCLUSIVE" : "LIMITED STOCK",
-        icon: type === "premium" ? "✨" : "⚡",
+        name: type === "premium" ? `Shield Ribbon Badge #${badges.length + 1}` : `Badge Campaign #${badges.length + 1}`,
+        shape: type === "premium" ? "SHIELD_RIBBON" : "PILL",
+        text: type === "premium" ? "BEST" : "LIMITED STOCK",
+        icon: type === "premium" ? "★" : "⚡",
       });
     }
     setModalOpen(true);
@@ -550,10 +550,8 @@ export default function SaaSAdminApp() {
   };
 
   // -------------------------------------------------------------
-  // FULLY CUSTOMIZABLE PREVIEW STYLES FOR PREMIUM BADGES
+  // ADVANCED SHIELD & CIRCLE RIBBON STYLES (FULL CUSTOMIZATION)
   // -------------------------------------------------------------
-  let isPremiumShape = ["GLASS_GLOW", "DIAGONAL_SLASH", "LUXURY_SEAL", "ELEVATED_3D"].includes(formData.shape);
-
   let previewShapeStyles = {
     background: formData.bgColor || "#DC2626",
     color: formData.textColor || "#FFFFFF",
@@ -569,47 +567,46 @@ export default function SaaSAdminApp() {
     textTransform: "uppercase",
   };
 
-  if (formData.shape === "GLASS_GLOW") {
+  if (formData.shape === "SHIELD_RIBBON") {
     previewShapeStyles = {
       ...previewShapeStyles,
-      background: formData.bgColor || "#1E1B4B",
-      color: formData.textColor || "#C084FC",
-      border: `1px solid ${formData.borderColor || "#7C3AED"}`,
-      borderRadius: `${formData.borderRadius || 12}px`,
-      padding: `${formData.paddingY || 6}px ${formData.paddingX || 14}px`,
-      backdropFilter: "blur(12px)",
-      boxShadow: `0 8px 32px rgba(0,0,0,0.25), 0 0 15px ${formData.bgColor || "#7C3AED"}`,
-    };
-  } else if (formData.shape === "DIAGONAL_SLASH") {
-    previewShapeStyles = {
-      ...previewShapeStyles,
-      background: formData.bgColor || "#DC2626",
+      background: formData.bgColor || "#EAB308",
       color: formData.textColor || "#FFFFFF",
-      border: `1px solid ${formData.borderColor || "#991B1B"}`,
-      borderRadius: `${formData.borderRadius || 4}px`,
-      padding: `${formData.paddingY || 6}px ${formData.paddingX || 14}px`,
-      clipPath: "polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%)",
-      boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+      border: `2px dashed ${formData.borderColor || "#CA8A04"}`,
+      borderRadius: `${formData.borderRadius || 8}px`,
+      padding: `${formData.paddingY || 8}px ${formData.paddingX || 16}px`,
+      boxShadow: "0 8px 20px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.4)",
+      position: "relative",
     };
-  } else if (formData.shape === "LUXURY_SEAL") {
+  } else if (formData.shape === "CIRCLE_RIBBON") {
     previewShapeStyles = {
       ...previewShapeStyles,
-      background: formData.bgColor || "#78350F",
-      color: formData.textColor || "#FDE68A",
-      border: `2px dashed ${formData.borderColor || "#F59E0B"}`,
+      background: formData.bgColor || "#3B82F6",
+      color: formData.textColor || "#FFFFFF",
+      border: `2px solid ${formData.borderColor || "#1D4ED8"}`,
       borderRadius: `${formData.borderRadius || 999}px`,
       padding: `${formData.paddingY || 8}px ${formData.paddingX || 16}px`,
-      boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+      boxShadow: "0 8px 20px rgba(0,0,0,0.3), inset 0 2px 5px rgba(255,255,255,0.4)",
     };
-  } else if (formData.shape === "ELEVATED_3D") {
+  } else if (formData.shape === "BADGE_SHIELD") {
     previewShapeStyles = {
       ...previewShapeStyles,
-      background: formData.bgColor || "#065F46",
-      color: formData.textColor || "#A7F3D0",
-      border: `1px solid ${formData.borderColor || "#047857"}`,
-      borderRadius: `${formData.borderRadius || 8}px`,
-      padding: `${formData.paddingY || 6}px ${formData.paddingX || 14}px`,
-      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.4), 0 8px 10px -6px rgba(0,0,0,0.4)",
+      background: formData.bgColor || "#EF4444",
+      color: formData.textColor || "#FFFFFF",
+      border: `2px solid ${formData.borderColor || "#B91C1C"}`,
+      borderRadius: `${formData.borderRadius || 12}px`,
+      padding: `${formData.paddingY || 8}px ${formData.paddingX || 16}px`,
+      boxShadow: "0 8px 20px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.3)",
+    };
+  } else if (formData.shape === "ROUND_BANNER") {
+    previewShapeStyles = {
+      ...previewShapeStyles,
+      background: formData.bgColor || "#10B981",
+      color: formData.textColor || "#FFFFFF",
+      border: `2px solid ${formData.borderColor || "#047857"}`,
+      borderRadius: `${formData.borderRadius || 12}px`,
+      padding: `${formData.paddingY || 8}px ${formData.paddingX || 16}px`,
+      boxShadow: "0 8px 20px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.3)",
     };
   }
 
@@ -732,7 +729,6 @@ export default function SaaSAdminApp() {
                   >
                     {badges.map((badge, index) => {
                       const ctr = badge.impressions > 0 ? ((badge.clicks / badge.impressions) * 100).toFixed(2) : "0.00";
-                      const isPrem = ["GLASS_GLOW", "DIAGONAL_SLASH", "LUXURY_SEAL", "ELEVATED_3D"].includes(badge.shape);
                       
                       let tableBadgeStyle = {
                           background: badge.shape === "OUTLINE" ? "transparent" : badge.bgColor,
@@ -749,16 +745,8 @@ export default function SaaSAdminApp() {
                           whiteSpace: "nowrap",
                       };
 
-                      if (badge.shape === "GLASS_GLOW") {
-                        tableBadgeStyle.border = `1px solid ${badge.borderColor || badge.bgColor}`;
-                        tableBadgeStyle.boxShadow = `0 4px 15px rgba(0,0,0,0.2), 0 0 10px ${badge.bgColor}`;
-                      } else if (badge.shape === "DIAGONAL_SLASH") {
-                        tableBadgeStyle.clipPath = "polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%)";
-                        tableBadgeStyle.padding = `4px 14px`;
-                      } else if (badge.shape === "LUXURY_SEAL") {
-                        tableBadgeStyle.border = `2px dashed ${badge.borderColor || badge.textColor}`;
-                      } else if (badge.shape === "ELEVATED_3D") {
-                        tableBadgeStyle.boxShadow = "0 6px 15px rgba(0,0,0,0.3)";
+                      if (["SHIELD_RIBBON", "CIRCLE_RIBBON", "BADGE_SHIELD", "ROUND_BANNER"].includes(badge.shape)) {
+                        tableBadgeStyle.boxShadow = "0 4px 12px rgba(0,0,0,0.25)";
                       }
 
                       return (
@@ -887,15 +875,15 @@ export default function SaaSAdminApp() {
                   <Card padding="400">
                     <BlockStack gap="300">
                       <Text variant="headingMd">
-                        {modalType === "premium" ? "Premium Style Presets" : "Quick styles"}
+                        {modalType === "premium" ? "Shield Ribbon Style Presets" : "Quick styles"}
                       </Text>
                       <InlineStack gap="200" wrap>
                         {modalType === "premium" ? (
                           <>
-                            <Button onClick={() => handleApplyPreset("GLASS_GLOW")}>Glass Glow</Button>
-                            <Button onClick={() => handleApplyPreset("DIAGONAL_SLASH")}>Diagonal Slash</Button>
-                            <Button onClick={() => handleApplyPreset("LUXURY_SEAL")}>Luxury Seal</Button>
-                            <Button onClick={() => handleApplyPreset("ELEVATED_3D")}>Elevated 3D</Button>
+                            <Button onClick={() => handleApplyPreset("SHIELD_RIBBON")}>Gold Shield</Button>
+                            <Button onClick={() => handleApplyPreset("CIRCLE_RIBBON")}>Blue Seal</Button>
+                            <Button onClick={() => handleApplyPreset("BADGE_SHIELD")}>Red Crest</Button>
+                            <Button onClick={() => handleApplyPreset("ROUND_BANNER")}>Green Shield</Button>
                           </>
                         ) : (
                           <>
@@ -946,10 +934,10 @@ export default function SaaSAdminApp() {
                         options={
                           modalType === "premium"
                             ? [
-                                { label: "Glass Glow (Modern Frosted Neon)", value: "GLASS_GLOW" },
-                                { label: "Diagonal Slash (Sleek Angular Tag)", value: "DIAGONAL_SLASH" },
-                                { label: "Luxury Seal (Dashed Elite Border)", value: "LUXURY_SEAL" },
-                                { label: "Elevated 3D (Deep Shadow Floating)", value: "ELEVATED_3D" },
+                                { label: "Gold Shield Ribbon", value: "SHIELD_RIBBON" },
+                                { label: "Blue Circular Seal Ribbon", value: "CIRCLE_RIBBON" },
+                                { label: "Red Crest Shield", value: "BADGE_SHIELD" },
+                                { label: "Green Shield Ribbon", value: "ROUND_BANNER" },
                               ]
                             : [
                                 { label: "Pill", value: "PILL" },
@@ -1013,7 +1001,7 @@ export default function SaaSAdminApp() {
                       >
                         <div style={previewShapeStyles}>
                           {formData.icon && <span>{formData.icon}</span>}
-                          <span>{formData.text || (modalType === "premium" ? "EXCLUSIVE" : "BADGE")}</span>
+                          <span>{formData.text || (modalType === "premium" ? "BEST" : "BADGE")}</span>
                         </div>
                       </Box>
                     </BlockStack>
