@@ -453,11 +453,9 @@ export default function SaaSAdminApp() {
 
   const [selectedTab, setSelectedTab] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalType, setModalType] = useState("standard"); // "standard" or "premium"
+  const [modalType, setModalType] = useState("standard");
   const [globalCssState, setGlobalCssState] = useState(settings?.globalCustomCss || "");
   const [formData, setFormData] = useState(DEFAULT_FORM);
-  const [previewTheme, setPreviewTheme] = useState("light");
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const isSaving = navigation.state === "submitting";
 
@@ -468,7 +466,6 @@ export default function SaaSAdminApp() {
     setModalType(type);
     if (badge) {
       setFormData(badgeToForm(badge));
-      // determine if existing badge is premium or standard based on shape
       const isPrem = ["RIBBON_BANNER", "STARBURST", "CORNER_FOLD", "FOLDED_RIBBON"].includes(badge.shape);
       setModalType(isPrem ? "premium" : "standard");
     } else {
@@ -481,7 +478,6 @@ export default function SaaSAdminApp() {
         icon: type === "premium" ? "" : "⚡",
       });
     }
-    setShowAdvanced(false);
     setModalOpen(true);
   };
 
@@ -539,63 +535,57 @@ export default function SaaSAdminApp() {
       window.alert("Shopify Resource Picker is not available in this session.");
       return;
     }
-
     const selected = await window.shopify.resourcePicker({
       type: "product",
       multiple: true,
       selectionIds: (formData.products || []).map((p) => ({ id: p.id })),
     });
-
     if (selected) {
       setFormData((prev) => ({
         ...prev,
-        products: selected.map((product) => ({
-          id: product.id,
-          handle: product.handle,
-        })),
+        products: selected.map((product) => ({ id: product.id, handle: product.handle })),
         productIds: selected.map((product) => product.id),
       }));
     }
   };
 
+  // -------------------------------------------------------------
+  // DYNAMIC RENDERER FOR PREMIUM SHAPES USING CLIP-PATH
+  // -------------------------------------------------------------
+  let isPremiumShape = ["RIBBON_BANNER", "STARBURST", "CORNER_FOLD", "FOLDED_RIBBON"].includes(formData.shape);
+
   let previewShapeStyles = {
     background: formData.bgColor || "#DC2626",
     color: formData.textColor || "#FFFFFF",
-    border: `1px solid ${formData.borderColor || formData.bgColor || "#991B1B"}`,
+    border: isPremiumShape ? "none" : `1px solid ${formData.borderColor || formData.bgColor || "#991B1B"}`,
     borderRadius: `${formData.borderRadius || 20}px`,
     padding: `${formData.paddingY || 4}px ${formData.paddingX || 10}px`,
     fontSize: `${formData.fontSize || 12}px`,
     fontWeight: formData.fontWeight || "bold",
     display: "inline-flex",
     alignItems: "center",
+    justifyContent: "center",
     gap: "5px",
     textTransform: "uppercase",
   };
 
   if (formData.shape === "RIBBON_BANNER") {
-    previewShapeStyles = {
-      ...previewShapeStyles,
-      borderRadius: "2px",
-      boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
-    };
+    previewShapeStyles.borderRadius = "0px";
+    previewShapeStyles.clipPath = "polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%)";
+    previewShapeStyles.paddingRight = `${(formData.paddingX || 12) + 12}px`;
   } else if (formData.shape === "STARBURST") {
-    previewShapeStyles = {
-      ...previewShapeStyles,
-      borderRadius: "6px",
-      boxShadow: `0 0 0 3px ${formData.bgColor || "#DC2626"}, 0 6px 15px rgba(0,0,0,0.4)`,
-    };
+    previewShapeStyles.borderRadius = "0px";
+    previewShapeStyles.clipPath = "polygon(50% 0%, 61% 15%, 79% 9%, 83% 26%, 100% 33%, 93% 50%, 100% 67%, 83% 74%, 79% 91%, 61% 85%, 50% 100%, 39% 85%, 21% 91%, 25% 74%, 0% 67%, 7% 50%, 0% 33%, 25% 26%, 21% 9%, 39% 15%)";
+    previewShapeStyles.padding = `${(formData.paddingY || 6) + 12}px ${(formData.paddingX || 12) + 8}px`;
   } else if (formData.shape === "CORNER_FOLD") {
-    previewShapeStyles = {
-      ...previewShapeStyles,
-      borderRadius: "0px 4px 4px 0px",
-      boxShadow: "2px 4px 10px rgba(0,0,0,0.3)",
-    };
+    previewShapeStyles.borderRadius = "0px";
+    previewShapeStyles.clipPath = "polygon(15% 0, 100% 0, 100% 100%, 15% 100%, 0 50%)";
+    previewShapeStyles.paddingLeft = `${(formData.paddingX || 12) + 12}px`;
   } else if (formData.shape === "FOLDED_RIBBON") {
-    previewShapeStyles = {
-      ...previewShapeStyles,
-      borderRadius: "2px",
-      boxShadow: "inset -4px 0 6px rgba(0,0,0,0.25), 0 4px 10px rgba(0,0,0,0.3)",
-    };
+    previewShapeStyles.borderRadius = "0px";
+    previewShapeStyles.clipPath = "polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%)";
+    previewShapeStyles.paddingLeft = `${(formData.paddingX || 12) + 10}px`;
+    previewShapeStyles.paddingRight = `${(formData.paddingX || 12) + 10}px`;
   }
 
   return (
@@ -681,16 +671,10 @@ export default function SaaSAdminApp() {
                     <Text variant="bodySm" tone="subdued">Manage every badge displayed on your storefront.</Text>
                   </BlockStack>
                   <InlineStack gap="300">
-                    <Button
-                      onClick={() => handleOpenModal("premium")}
-                    >
+                    <Button onClick={() => handleOpenModal("premium")}>
                       Create premium badge
                     </Button>
-                    <Button
-                      variant="primary"
-                      icon={PlusIcon}
-                      onClick={() => handleOpenModal("standard")}
-                    >
+                    <Button variant="primary" icon={PlusIcon} onClick={() => handleOpenModal("standard")}>
                       Create badge
                     </Button>
                   </InlineStack>
@@ -723,26 +707,50 @@ export default function SaaSAdminApp() {
                   >
                     {badges.map((badge, index) => {
                       const ctr = badge.impressions > 0 ? ((badge.clicks / badge.impressions) * 100).toFixed(2) : "0.00";
+                      const isPrem = ["RIBBON_BANNER", "STARBURST", "CORNER_FOLD", "FOLDED_RIBBON"].includes(badge.shape);
+                      
+                      let tableBadgeStyle = {
+                          background: badge.shape === "OUTLINE" ? "transparent" : badge.bgColor,
+                          color: badge.shape === "OUTLINE" ? badge.bgColor : badge.textColor,
+                          border: isPrem ? "none" : `1px solid ${badge.borderColor || badge.bgColor}`,
+                          borderRadius: badge.shape === "PILL" ? "999px" : badge.shape === "SHARP" ? "0px" : `${badge.borderRadius}px`,
+                          padding: `4px 10px`,
+                          fontSize: `12px`,
+                          fontWeight: badge.fontWeight || "700",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "4px",
+                          whiteSpace: "nowrap",
+                      };
+
+                      if (badge.shape === "RIBBON_BANNER") {
+                        tableBadgeStyle.borderRadius = "0px";
+                        tableBadgeStyle.clipPath = "polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%)";
+                        tableBadgeStyle.paddingRight = `16px`;
+                      } else if (badge.shape === "STARBURST") {
+                        tableBadgeStyle.borderRadius = "0px";
+                        tableBadgeStyle.clipPath = "polygon(50% 0%, 61% 15%, 79% 9%, 83% 26%, 100% 33%, 93% 50%, 100% 67%, 83% 74%, 79% 91%, 61% 85%, 50% 100%, 39% 85%, 21% 91%, 25% 74%, 0% 67%, 7% 50%, 0% 33%, 25% 26%, 21% 9%, 39% 15%)";
+                        tableBadgeStyle.padding = `10px 12px`;
+                      } else if (badge.shape === "CORNER_FOLD") {
+                        tableBadgeStyle.borderRadius = "0px";
+                        tableBadgeStyle.clipPath = "polygon(15% 0, 100% 0, 100% 100%, 15% 100%, 0 50%)";
+                        tableBadgeStyle.paddingLeft = `16px`;
+                      } else if (badge.shape === "FOLDED_RIBBON") {
+                        tableBadgeStyle.borderRadius = "0px";
+                        tableBadgeStyle.clipPath = "polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%)";
+                        tableBadgeStyle.paddingLeft = `14px`;
+                        tableBadgeStyle.paddingRight = `14px`;
+                      }
+
                       return (
                         <IndexTable.Row id={badge.id} key={badge.id} position={index}>
                           <IndexTable.Cell>
-                            <div
-                              style={{
-                                background: badge.shape === "OUTLINE" ? "transparent" : badge.bgColor,
-                                color: badge.shape === "OUTLINE" ? badge.bgColor : badge.textColor,
-                                border: `1px solid ${badge.borderColor || badge.bgColor}`,
-                                borderRadius: badge.shape === "PILL" ? "999px" : badge.shape === "SHARP" ? "0px" : `${badge.borderRadius}px`,
-                                padding: `4px 10px`,
-                                fontSize: `12px`,
-                                fontWeight: badge.fontWeight || "700",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "4px",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {badge.icon && <span>{badge.icon}</span>}
-                              <span>{badge.text}</span>
+                            <div style={{ filter: isPrem ? "drop-shadow(0px 2px 4px rgba(0,0,0,0.25))" : "none" }}>
+                                <div style={tableBadgeStyle}>
+                                  {badge.icon && <span>{badge.icon}</span>}
+                                  <span>{badge.text}</span>
+                                </div>
                             </div>
                           </IndexTable.Cell>
                           <IndexTable.Cell>
@@ -986,9 +994,12 @@ export default function SaaSAdminApp() {
                           alignItems: "center",
                         }}
                       >
-                        <div style={previewShapeStyles}>
-                          {formData.icon && <span>{formData.icon}</span>}
-                          <span>{formData.text || (modalType === "premium" ? "NEW" : "BADGE")}</span>
+                        {/* WRAPPER IS NEEDED FOR DROP-SHADOW ON CLIPPED ELEMENTS */}
+                        <div style={{ filter: isPremiumShape ? "drop-shadow(0px 4px 6px rgba(0,0,0,0.35))" : "none" }}>
+                          <div style={previewShapeStyles}>
+                            {formData.icon && <span>{formData.icon}</span>}
+                            <span>{formData.text || (modalType === "premium" ? "NEW" : "BADGE")}</span>
+                          </div>
                         </div>
                       </Box>
                     </BlockStack>

@@ -39,72 +39,67 @@
           }
           
           if (activeBadge) {
-            const badgeElement = document.createElement('div');
-            
             let shapeCss = '';
-            const bg = activeBadge.bgColor || '#DC2626';
-            const color = activeBadge.textColor || '#FFFFFF';
-            const border = `1px solid ${activeBadge.borderColor || bg}`;
+            let wrapperFilter = 'none';
+            const bg = activeBadge.shape === 'OUTLINE' ? 'transparent' : (activeBadge.bgColor || '#DC2626');
+            const color = activeBadge.shape === 'OUTLINE' ? (activeBadge.bgColor || '#DC2626') : (activeBadge.textColor || '#FFFFFF');
+            const border = activeBadge.shape === 'OUTLINE' ? `1px solid ${bg}` : `1px solid ${activeBadge.borderColor || bg}`;
             
+            // Generate actual ribbon and starburst cuts using clip-path polygons
             if (activeBadge.shape === 'RIBBON_BANNER') {
               shapeCss = `
-                background: ${bg};
-                color: ${color};
-                border: ${border};
-                border-radius: 2px;
-                padding: ${activeBadge.paddingY || 6}px ${activeBadge.paddingX || 12}px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+                background: ${bg}; color: ${color}; border: none; border-radius: 0;
+                padding: ${activeBadge.paddingY || 6}px ${(activeBadge.paddingX || 12) + 12}px ${activeBadge.paddingY || 6}px ${activeBadge.paddingX || 12}px;
+                clip-path: polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%);
               `;
+              wrapperFilter = 'drop-shadow(0px 4px 6px rgba(0,0,0,0.35))';
             } else if (activeBadge.shape === 'STARBURST') {
               shapeCss = `
-                background: ${bg};
-                color: ${color};
-                border: ${border};
-                border-radius: 6px;
-                padding: ${activeBadge.paddingY || 6}px ${activeBadge.paddingX || 12}px;
-                box-shadow: 0 0 0 3px ${bg}, 0 6px 15px rgba(0,0,0,0.4);
+                background: ${bg}; color: ${color}; border: none; border-radius: 0;
+                padding: ${(activeBadge.paddingY || 6) + 12}px ${(activeBadge.paddingX || 12) + 8}px;
+                clip-path: polygon(50% 0%, 61% 15%, 79% 9%, 83% 26%, 100% 33%, 93% 50%, 100% 67%, 83% 74%, 79% 91%, 61% 85%, 50% 100%, 39% 85%, 21% 91%, 25% 74%, 0% 67%, 7% 50%, 0% 33%, 25% 26%, 21% 9%, 39% 15%);
               `;
+              wrapperFilter = 'drop-shadow(0px 4px 6px rgba(0,0,0,0.35))';
             } else if (activeBadge.shape === 'CORNER_FOLD') {
               shapeCss = `
-                background: ${bg};
-                color: ${color};
-                border: ${border};
-                border-radius: 0px 4px 4px 0px;
-                padding: ${activeBadge.paddingY || 6}px ${activeBadge.paddingX || 12}px;
-                box-shadow: 2px 4px 10px rgba(0,0,0,0.3);
+                background: ${bg}; color: ${color}; border: none; border-radius: 0;
+                padding: ${activeBadge.paddingY || 6}px ${activeBadge.paddingX || 12}px ${activeBadge.paddingY || 6}px ${(activeBadge.paddingX || 12) + 12}px;
+                clip-path: polygon(15% 0, 100% 0, 100% 100%, 15% 100%, 0 50%);
               `;
+              wrapperFilter = 'drop-shadow(0px 4px 6px rgba(0,0,0,0.35))';
             } else if (activeBadge.shape === 'FOLDED_RIBBON') {
               shapeCss = `
-                background: ${bg};
-                color: ${color};
-                border: ${border};
-                border-radius: 2px;
-                padding: ${activeBadge.paddingY || 6}px ${activeBadge.paddingX || 12}px;
-                box-shadow: inset -4px 0 6px rgba(0,0,0,0.25), 0 4px 10px rgba(0,0,0,0.3);
+                background: ${bg}; color: ${color}; border: none; border-radius: 0;
+                padding: ${activeBadge.paddingY || 6}px ${(activeBadge.paddingX || 12) + 10}px;
+                clip-path: polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%);
               `;
+              wrapperFilter = 'drop-shadow(0px 4px 6px rgba(0,0,0,0.35))';
             } else {
               const radius = activeBadge.shape === 'PILL' ? '999px' : (activeBadge.shape === 'SHARP' ? '0px' : activeBadge.borderRadius + 'px');
-              const finalBg = activeBadge.shape === 'OUTLINE' ? 'transparent' : bg;
-              const finalColor = activeBadge.shape === 'OUTLINE' ? bg : color;
               shapeCss = `
-                background: ${finalBg};
-                color: ${finalColor};
-                border: ${border};
-                border-radius: ${radius};
+                background: ${bg}; color: ${color}; border: ${border}; border-radius: ${radius};
                 padding: ${activeBadge.paddingY}px ${activeBadge.paddingX}px;
                 box-shadow: 0 3px 10px rgba(0,0,0,0.2);
               `;
             }
 
-            badgeElement.style.cssText = `
+            // Wrapper is required because clip-path hides drop-shadows otherwise
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = `
               position: absolute;
               top: 10px;
               left: 10px;
               z-index: 2;
+              filter: ${wrapperFilter};
+            `;
+
+            const badgeElement = document.createElement('div');
+            badgeElement.style.cssText = `
               font-size: ${activeBadge.fontSize}px;
               font-weight: ${activeBadge.fontWeight};
               display: inline-flex;
               align-items: center;
+              justify-content: center;
               gap: 4px;
               text-transform: uppercase;
               ${shapeCss}
@@ -113,8 +108,9 @@
             
             badgeElement.innerHTML = `${activeBadge.icon ? `<span>${activeBadge.icon}</span>` : ''} <span>${activeBadge.text}</span>`;
             
+            wrapper.appendChild(badgeElement);
             card.style.position = 'relative';
-            card.appendChild(badgeElement);
+            card.appendChild(wrapper);
           }
         });
       }
