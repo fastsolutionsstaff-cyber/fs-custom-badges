@@ -46,7 +46,6 @@
             const color = activeBadge.textColor || '#FFFFFF';
             const border = `1px solid ${activeBadge.borderColor || bg}`;
             
-            // Generate professional 3D-styled CSS based on shape selection matching reference image
             if (activeBadge.shape === 'RIBBON_BANNER') {
               shapeCss = `
                 background: ${bg};
@@ -84,7 +83,6 @@
                 box-shadow: inset -4px 0 6px rgba(0,0,0,0.25), 0 4px 10px rgba(0,0,0,0.3);
               `;
             } else {
-              // Fallback for standard shapes
               const radius = activeBadge.shape === 'PILL' ? '999px' : (activeBadge.shape === 'SHARP' ? '0px' : activeBadge.borderRadius + 'px');
               const finalBg = activeBadge.shape === 'OUTLINE' ? 'transparent' : bg;
               const finalColor = activeBadge.shape === 'OUTLINE' ? bg : color;

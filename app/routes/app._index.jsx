@@ -45,22 +45,22 @@ const DEFAULT_FORM = {
   name: "",
   enabled: true,
 
-  text: "NEW",
-  icon: "",
+  text: "LIMITED STOCK",
+  icon: "⚡",
 
   bgColor: "#DC2626",
   textColor: "#FFFFFF",
   borderColor: "#991B1B",
 
-  shape: "RIBBON_BANNER",
+  shape: "PILL",
   position: "TOP_LEFT",
 
   fontSize: 12,
   fontWeight: "bold",
 
-  paddingX: 12,
-  paddingY: 6,
-  borderRadius: 4,
+  paddingX: 10,
+  paddingY: 4,
+  borderRadius: 20,
 
   priority: 10,
 
@@ -86,6 +86,54 @@ const DEFAULT_FORM = {
 };
 
 const PRESETS = {
+  BLACK_FRIDAY: {
+    text: "BLACK FRIDAY",
+    icon: "⚡",
+    bgColor: "#111111",
+    textColor: "#FFFFFF",
+    borderColor: "#000000",
+    shape: "PILL",
+  },
+  URGENCY: {
+    text: "ONLY FEW LEFT",
+    icon: "🚨",
+    bgColor: "#DC2626",
+    textColor: "#FFFFFF",
+    borderColor: "#991B1B",
+    shape: "PILL",
+  },
+  MINIMAL: {
+    text: "PREMIUM",
+    icon: "✦",
+    bgColor: "#FFFFFF",
+    textColor: "#111827",
+    borderColor: "#111827",
+    shape: "OUTLINE",
+  },
+  ECO: {
+    text: "100% ORGANIC",
+    icon: "🌿",
+    bgColor: "#059669",
+    textColor: "#FFFFFF",
+    borderColor: "#047857",
+    shape: "PILL",
+  },
+  HOT_SALE: {
+    text: "HOT SALE",
+    icon: "🔥",
+    bgColor: "#2563EB",
+    textColor: "#FFFFFF",
+    borderColor: "#1D4ED8",
+    shape: "PILL",
+  },
+  BEST_SELLER: {
+    text: "BEST SELLER",
+    icon: "⭐",
+    bgColor: "#111827",
+    textColor: "#FFFFFF",
+    borderColor: "#000000",
+    shape: "PILL",
+  },
   PREMIUM_RIBBON: {
     text: "NEW",
     icon: "",
@@ -110,7 +158,7 @@ const PRESETS = {
     borderColor: "#991B1B",
     shape: "CORNER_FOLD",
   },
-  FOLDED_BANNER: {
+  FOLDED_RIBBON: {
     text: "NEW",
     icon: "",
     bgColor: "#B91C1C",
@@ -135,9 +183,9 @@ function badgeToForm(badge) {
     enabled: Boolean(badge.enabled),
 
     fontSize: Number(badge.fontSize ?? 12),
-    paddingX: Number(badge.paddingX ?? 12),
-    paddingY: Number(badge.paddingY ?? 6),
-    borderRadius: Number(badge.borderRadius ?? 4),
+    paddingX: Number(badge.paddingX ?? 10),
+    paddingY: Number(badge.paddingY ?? 4),
+    borderRadius: Number(badge.borderRadius ?? 20),
     priority: Number(badge.priority ?? 0),
 
     minInventory: Number(badge.minInventory ?? 0),
@@ -235,17 +283,17 @@ export const action = async ({ request }) => {
           enabled: false,
           priority: existing.priority || 0,
           text: existing.text || "",
-          bgColor: existing.bgColor || "#DC2626",
+          bgColor: existing.bgColor || "#111827",
           textColor: existing.textColor || "#FFFFFF",
           borderColor: existing.borderColor || "#000000",
           position: existing.position || "TOP_LEFT",
-          shape: existing.shape || "RIBBON_BANNER",
+          shape: existing.shape || "PILL",
           icon: existing.icon || "",
           fontSize: existing.fontSize || 12,
           fontWeight: existing.fontWeight || "bold",
-          paddingY: existing.paddingY || 6,
-          paddingX: existing.paddingX || 12,
-          borderRadius: existing.borderRadius || 4,
+          paddingY: existing.paddingY || 4,
+          paddingX: existing.paddingX || 10,
+          borderRadius: existing.borderRadius || 20,
           customCss: existing.customCss || "",
           hideOnMobile: Boolean(existing.hideOnMobile),
           hideOnDesktop: Boolean(existing.hideOnDesktop),
@@ -285,19 +333,19 @@ export const action = async ({ request }) => {
   const id = String(formData.get("id") || "");
   const name = String(formData.get("name") || "").trim() || "Untitled Badge Campaign";
   const enabled = formData.get("enabled") === "true";
-  const text = String(formData.get("text") || "NEW").trim();
+  const text = String(formData.get("text") || "BADGE").trim();
   const icon = String(formData.get("icon") || "");
-  const bgColor = String(formData.get("bgColor") || "#DC2626");
+  const bgColor = String(formData.get("bgColor") || "#111827");
   const textColor = String(formData.get("textColor") || "#FFFFFF");
-  const borderColor = String(formData.get("borderColor") || "#991B1B");
+  const borderColor = String(formData.get("borderColor") || "#000000");
   const position = String(formData.get("position") || "TOP_LEFT");
-  const shape = String(formData.get("shape") || "RIBBON_BANNER");
+  const shape = String(formData.get("shape") || "PILL");
 
   const fontSize = parseInt(formData.get("fontSize") || "12", 10) || 12;
   const fontWeight = String(formData.get("fontWeight") || "bold");
-  const paddingX = parseInt(formData.get("paddingX") || "12", 10) || 12;
-  const paddingY = parseInt(formData.get("paddingY") || "6", 10) || 6;
-  const borderRadius = parseInt(formData.get("borderRadius") || "4", 10) || 4;
+  const paddingX = parseInt(formData.get("paddingX") || "10", 10) || 10;
+  const paddingY = parseInt(formData.get("paddingY") || "4", 10) || 4;
+  const borderRadius = parseInt(formData.get("borderRadius") || "20", 10) || 20;
   const priority = parseInt(formData.get("priority") || "0", 10) || 0;
 
   const targetType = String(formData.get("targetType") || "GLOBAL");
@@ -487,20 +535,18 @@ export default function SaaSAdminApp() {
     }
   };
 
-  // Dynamic preview styling for admin dashboard preview matching premium 3D styles
   let previewShapeStyles = {
     background: formData.bgColor || "#DC2626",
     color: formData.textColor || "#FFFFFF",
     border: `1px solid ${formData.borderColor || formData.bgColor || "#991B1B"}`,
-    borderRadius: `${formData.borderRadius || 4}px`,
-    padding: `${formData.paddingY || 6}px ${formData.paddingX || 12}px`,
+    borderRadius: `${formData.borderRadius || 20}px`,
+    padding: `${formData.paddingY || 4}px ${formData.paddingX || 10}px`,
     fontSize: `${formData.fontSize || 12}px`,
     fontWeight: formData.fontWeight || "bold",
     display: "inline-flex",
     alignItems: "center",
     gap: "5px",
     textTransform: "uppercase",
-    boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
   };
 
   if (formData.shape === "RIBBON_BANNER") {
@@ -637,10 +683,10 @@ export default function SaaSAdminApp() {
                           <IndexTable.Cell>
                             <div
                               style={{
-                                background: badge.bgColor,
-                                color: badge.textColor,
+                                background: badge.shape === "OUTLINE" ? "transparent" : badge.bgColor,
+                                color: badge.shape === "OUTLINE" ? badge.bgColor : badge.textColor,
                                 border: `1px solid ${badge.borderColor || badge.bgColor}`,
-                                borderRadius: badge.shape === 'STARBURST' ? '6px' : '4px',
+                                borderRadius: badge.shape === "PILL" ? "999px" : badge.shape === "SHARP" ? "0px" : `${badge.borderRadius}px`,
                                 padding: `4px 10px`,
                                 fontSize: `12px`,
                                 fontWeight: badge.fontWeight || "700",
@@ -648,7 +694,6 @@ export default function SaaSAdminApp() {
                                 alignItems: "center",
                                 gap: "4px",
                                 whiteSpace: "nowrap",
-                                boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
                               }}
                             >
                               {badge.icon && <span>{badge.icon}</span>}
@@ -766,12 +811,18 @@ export default function SaaSAdminApp() {
 
                   <Card padding="400">
                     <BlockStack gap="300">
-                      <Text variant="headingMd">Premium 3D Badge Presets</Text>
+                      <Text variant="headingMd">Quick styles & Premium 3D Badges</Text>
                       <InlineStack gap="200" wrap>
+                        <Button onClick={() => handleApplyPreset("BLACK_FRIDAY")}>Black Friday</Button>
+                        <Button onClick={() => handleApplyPreset("URGENCY")}>Urgency</Button>
+                        <Button onClick={() => handleApplyPreset("MINIMAL")}>Minimal</Button>
+                        <Button onClick={() => handleApplyPreset("ECO")}>Eco</Button>
+                        <Button onClick={() => handleApplyPreset("HOT_SALE")}>Hot Sale</Button>
+                        <Button onClick={() => handleApplyPreset("BEST_SELLER")}>Best Seller</Button>
                         <Button onClick={() => handleApplyPreset("PREMIUM_RIBBON")}>Ribbon Banner</Button>
                         <Button onClick={() => handleApplyPreset("STARBURST_SEAL")}>Starburst Seal</Button>
                         <Button onClick={() => handleApplyPreset("CORNER_TAG")}>Corner Tag</Button>
-                        <Button onClick={() => handleApplyPreset("FOLDED_BANNER")}>Folded Ribbon</Button>
+                        <Button onClick={() => handleApplyPreset("FOLDED_RIBBON")}>Folded Ribbon</Button>
                       </InlineStack>
                     </BlockStack>
                   </Card>
@@ -793,7 +844,7 @@ export default function SaaSAdminApp() {
 
                   <Card padding="400">
                     <BlockStack gap="400">
-                      <Text variant="headingMd">Appearance & Premium Shapes</Text>
+                      <Text variant="headingMd">Appearance</Text>
                       <Grid>
                         <Grid.Cell columnSpan={{ xs: 4, sm: 4, md: 4, lg: 4, xl: 4 }}>
                           <TextField label="Background" type="color" value={formData.bgColor} onChange={(v) => updateForm("bgColor", v)} />
@@ -807,16 +858,16 @@ export default function SaaSAdminApp() {
                       </Grid>
 
                       <Select
-                        label="Badge Shape Style"
+                        label="Shape Style"
                         options={[
-                          { label: "Ribbon Banner (3D Red)", value: "RIBBON_BANNER" },
-                          { label: "Starburst Seal", value: "STARBURST" },
-                          { label: "Corner Fold Tag", value: "CORNER_FOLD" },
-                          { label: "Folded Ribbon Tag", value: "FOLDED_RIBBON" },
-                          { label: "Classic Pill", value: "PILL" },
-                          { label: "Sharp Box", value: "SHARP" },
+                          { label: "Pill", value: "PILL" },
+                          { label: "Sharp", value: "SHARP" },
                           { label: "Outline", value: "OUTLINE" },
                           { label: "Glassmorphism", value: "GLASSMORPHISM" },
+                          { label: "Ribbon Banner (Premium 3D)", value: "RIBBON_BANNER" },
+                          { label: "Starburst Seal (Premium 3D)", value: "STARBURST" },
+                          { label: "Corner Fold Tag (Premium 3D)", value: "CORNER_FOLD" },
+                          { label: "Folded Ribbon Tag (Premium 3D)", value: "FOLDED_RIBBON" },
                         ]}
                         value={formData.shape}
                         onChange={(v) => updateForm("shape", v)}
@@ -870,7 +921,7 @@ export default function SaaSAdminApp() {
                       >
                         <div style={previewShapeStyles}>
                           {formData.icon && <span>{formData.icon}</span>}
-                          <span>{formData.text || "NEW"}</span>
+                          <span>{formData.text || "BADGE"}</span>
                         </div>
                       </Box>
                     </BlockStack>
