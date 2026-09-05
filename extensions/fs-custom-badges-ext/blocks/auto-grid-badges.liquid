@@ -41,12 +41,12 @@
           if (activeBadge) {
             const badgeElement = document.createElement('div');
             
-            const bg = activeBadge.bgColor || '#DC2626';
+            const bg = activeBadge.bgColor || '#2563EB';
             const color = activeBadge.textColor || '#FFFFFF';
             const border = activeBadge.borderColor || bg;
-            const radius = activeBadge.borderRadius || 20;
-            const px = activeBadge.paddingX || 10;
-            const py = activeBadge.paddingY || 4;
+            const radius = activeBadge.borderRadius || 8;
+            const px = activeBadge.paddingX || 16;
+            const py = activeBadge.paddingY || 8;
             const fontSize = activeBadge.fontSize || 12;
             const fontWeight = activeBadge.fontWeight || 'bold';
 
@@ -58,14 +58,43 @@
               padding: ${py}px ${px}px;
             `;
 
-            if (["SHIELD_RIBBON", "CIRCLE_RIBBON", "BADGE_SHIELD", "ROUND_BANNER"].includes(activeBadge.shape)) {
+            if (activeBadge.shape === 'GLASS_GLOW') {
+              shapeCss = `
+                background: ${bg};
+                color: ${color};
+                border: 1px solid ${border};
+                border-radius: ${radius}px;
+                padding: ${py}px ${px}px;
+                backdrop-filter: blur(12px);
+                box-shadow: 0 8px 32px rgba(0,0,0,0.25), 0 0 15px ${bg};
+              `;
+            } else if (activeBadge.shape === 'DIAGONAL_SLASH') {
+              shapeCss = `
+                background: ${bg};
+                color: ${color};
+                border: 1px solid ${border};
+                border-radius: ${radius}px;
+                padding: ${py}px ${px}px;
+                clip-path: polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+              `;
+            } else if (activeBadge.shape === 'LUXURY_SEAL') {
+              shapeCss = `
+                background: ${bg};
+                color: ${color};
+                border: 2px dashed ${border};
+                border-radius: ${radius}px;
+                padding: ${py}px ${px}px;
+                box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+              `;
+            } else if (activeBadge.shape === 'RIBBON_SHIELD') {
               shapeCss = `
                 background: ${bg};
                 color: ${color};
                 border: 2px solid ${border};
                 border-radius: ${radius}px;
                 padding: ${py}px ${px}px;
-                box-shadow: 0 8px 20px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.3);
+                box-shadow: 0 6px 20px rgba(0,0,0,0.35);
               `;
             }
 
