@@ -702,6 +702,23 @@ export default function SaaSAdminApp() {
           </Banner>
         )}
 
+        {/* Professional Upgrade Banner for Free Plan Users */}
+        {!isPro && (
+          <Card background="bg-surface-secondary" padding="400">
+            <InlineStack align="space-between" blockAlign="center">
+              <BlockStack gap="100">
+                <Text variant="headingMd">You are currently on the Free Plan</Text>
+                <Text variant="bodySm" tone="subdued">
+                  Limited to 2 badges and standard shapes. Upgrade to Pro for unlimited badges and premium shapes.
+                </Text>
+              </BlockStack>
+              <Button variant="primary" onClick={handleUpgrade}>
+                Upgrade to Pro ($2.99/mo)
+              </Button>
+            </InlineStack>
+          </Card>
+        )}
+
         <Grid>
           <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
             <Card padding="400">
