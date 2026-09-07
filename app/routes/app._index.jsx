@@ -221,8 +221,15 @@ function badgeToForm(badge) {
 }
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
+  const { session, billing } = await authenticate.admin(request);
   const shop = session.shop;
+
+  // Check Billing Plan
+  const billingCheck = await billing.check({
+    plans: ["Pro Plan"],
+    isTest: true,
+  });
+  const isPro = billingCheck.hasActivePayment;
 
   let settings = await db.appSettings.findUnique({
     where: { shop },
@@ -261,6 +268,7 @@ export const loader = async ({ request }) => {
     shop,
     settings,
     badges: formattedBadges,
+    isPro,
     analytics: {
       totalImpressions,
       totalClicks,
@@ -271,10 +279,25 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
+  const { session, billing } = await authenticate.admin(request);
   const shop = session.shop;
   const formData = await request.formData();
   const intent = formData.get("intent");
+
+  // Handle native Shopify Billing Upgrade
+  if (intent === "UPGRADE") {
+    return await billing.request({
+      plan: "Pro Plan",
+      isTest: true,
+    });
+  }
+
+  // Active Billing check for backend security enforcement
+  const billingCheck = await billing.check({
+    plans: ["Pro Plan"],
+    isTest: true,
+  });
+  const isPro = billingCheck.hasActivePayment;
 
   if (intent === "DELETE") {
     const id = String(formData.get("id") || "");
@@ -289,6 +312,12 @@ export const action = async ({ request }) => {
     const id = String(formData.get("id") || "");
     const existing = await db.badge.findFirst({ where: { id, shop } });
     if (!existing) return json({ success: false, message: "Badge campaign not found." }, { status: 404 });
+    
+    // Enforcement: Free tier duplicate lock
+    if (!isPro) {
+      const count = await db.badge.count({ where: { shop } });
+      if (count >= 2) return json({ success: false, message: "Limit reached. Upgrade to Pro to duplicate." });
+    }
 
     await db.$transaction(async (tx) => {
       const duplicate = await tx.badge.create({
@@ -346,6 +375,22 @@ export const action = async ({ request }) => {
   }
 
   const id = String(formData.get("id") || "");
+  const shape = String(formData.get("shape") || "PILL");
+  const isPremShape = ["GLASS_GLOW", "DIAGONAL_SLASH", "LUXURY_SEAL", "RIBBON_SHIELD"].includes(shape);
+
+  // Server-side enforcement in case they bypass UI
+  if (!isPro) {
+    if (isPremShape) {
+      return json({ success: false, message: "Premium widgets require the Pro Plan." });
+    }
+    if (id === "new") {
+      const count = await db.badge.count({ where: { shop } });
+      if (count >= 2) {
+        return json({ success: false, message: "Free plan limit reached (2 widgets max)." });
+      }
+    }
+  }
+
   const name = String(formData.get("name") || "").trim() || "Untitled Badge Campaign";
   const enabled = formData.get("enabled") === "true";
   const text = String(formData.get("text") || "BADGE").trim();
@@ -354,7 +399,6 @@ export const action = async ({ request }) => {
   const textColor = String(formData.get("textColor") || "#FFFFFF");
   const borderColor = String(formData.get("borderColor") || "#000000");
   const position = String(formData.get("position") || "TOP_LEFT");
-  const shape = String(formData.get("shape") || "PILL");
 
   const fontSize = parseInt(formData.get("fontSize") || "12", 10) || 12;
   const fontWeight = String(formData.get("fontWeight") || "bold");
@@ -446,7 +490,7 @@ export const action = async ({ request }) => {
 };
 
 export default function SaaSAdminApp() {
-  const { settings, badges = [], analytics = {} } = useLoaderData();
+  const { settings, badges = [], analytics = {}, isPro } = useLoaderData();
   const actionData = useActionData();
   const submit = useSubmit();
   const navigation = useNavigation();
@@ -456,6 +500,10 @@ export default function SaaSAdminApp() {
   const [modalType, setModalType] = useState("standard");
   const [globalCssState, setGlobalCssState] = useState(settings?.globalCustomCss || "");
   const [formData, setFormData] = useState(DEFAULT_FORM);
+  
+  // Upgrade Popup States
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [upgradeMessage, setUpgradeMessage] = useState("");
 
   const isSaving = navigation.state === "submitting";
 
@@ -463,11 +511,28 @@ export default function SaaSAdminApp() {
   const disabledBadges = useMemo(() => badges.filter((b) => !b.enabled), [badges]);
 
   const handleOpenModal = (type = "standard", badge = null) => {
-    setModalType(type);
+    let isPrem = type === "premium";
+    if (badge) {
+      isPrem = ["GLASS_GLOW", "DIAGONAL_SLASH", "LUXURY_SEAL", "RIBBON_SHIELD"].includes(badge.shape);
+    }
+
+    // Limit Interceptor Check
+    if (!isPro) {
+      if (isPrem) {
+        setUpgradeMessage("Upgrade to Pro to create and unlock Premium widgets.");
+        setUpgradeModalOpen(true);
+        return;
+      }
+      if (!badge && badges.length >= 2) {
+        setUpgradeMessage("You have reached the limit of 2 widgets on the Free Plan. Upgrade to Pro to activate unlimited widgets.");
+        setUpgradeModalOpen(true);
+        return;
+      }
+    }
+
+    setModalType(isPrem ? "premium" : "standard");
     if (badge) {
       setFormData(badgeToForm(badge));
-      const isPrem = ["GLASS_GLOW", "DIAGONAL_SLASH", "LUXURY_SEAL", "RIBBON_SHIELD"].includes(badge.shape);
-      setModalType(isPrem ? "premium" : "standard");
     } else {
       setFormData({
         ...DEFAULT_FORM,
@@ -479,6 +544,10 @@ export default function SaaSAdminApp() {
       });
     }
     setModalOpen(true);
+  };
+
+  const handleUpgrade = () => {
+    submit({ intent: "UPGRADE" }, { method: "post" });
   };
 
   const updateForm = (key, value) => {
@@ -549,9 +618,6 @@ export default function SaaSAdminApp() {
     }
   };
 
-  // -------------------------------------------------------------
-  // FULLY CUSTOMIZABLE PREVIEW STYLES (REPLACED ELEVATED 3D WITH RIBBON SHIELD)
-  // -------------------------------------------------------------
   let previewShapeStyles = {
     background: formData.bgColor || "#DC2626",
     color: formData.textColor || "#FFFFFF",
@@ -858,6 +924,27 @@ export default function SaaSAdminApp() {
           </Box>
         </Card>
 
+        {/* Upgrade Pro Modal Popup */}
+        <Modal
+          open={upgradeModalOpen}
+          onClose={() => setUpgradeModalOpen(false)}
+          title="Upgrade to Pro"
+          primaryAction={{
+            content: "Upgrade to Pro ($2.99/mo)",
+            onAction: handleUpgrade,
+          }}
+          secondaryActions={[{ content: "Cancel", onAction: () => setUpgradeModalOpen(false) }]}
+        >
+          <Modal.Section>
+            <BlockStack gap="300">
+              <Text as="p" variant="bodyMd">
+                {upgradeMessage}
+              </Text>
+            </BlockStack>
+          </Modal.Section>
+        </Modal>
+
+        {/* Standard Creation Modal */}
         <Modal
           open={modalOpen}
           onClose={() => setModalOpen(false)}
