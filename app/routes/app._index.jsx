@@ -221,26 +221,15 @@ function badgeToForm(badge) {
 }
 
 export const loader = async ({ request }) => {
-  const { session, admin } = await authenticate.admin(request);
+  const { session, billing } = await authenticate.admin(request);
   const shop = session.shop;
 
-  // Check Active Subscriptions via GraphQL
-  const subscriptionResponse = await admin.graphql(
-    `#graphql
-    query {
-      currentAppInstallation {
-        activeSubscriptions {
-          name
-          status
-        }
-      }
-    }`
-  );
-  const subData = await subscriptionResponse.json();
-  const subscriptions = subData.data?.currentAppInstallation?.activeSubscriptions || [];
-  const isPro = subscriptions.some(
-    (sub) => sub.status === "ACTIVE" && sub.name.toLowerCase().includes("pro")
-  );
+  // Check Billing Plan via Shopify Native Billing API
+  const billingCheck = await billing.check({
+    plans: ["Pro Plan"],
+    isTest: true,
+  });
+  const isPro = billingCheck.hasActivePayment;
 
   let settings = await db.appSettings.findUnique({
     where: { shop },
@@ -290,37 +279,25 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const { session, admin, redirect } = await authenticate.admin(request);
+  const { session, billing } = await authenticate.admin(request);
   const shop = session.shop;
   const formData = await request.formData();
   const intent = formData.get("intent");
 
-  // Handle Shopify App Pricing Upgrade Redirect
+  // Handle native Shopify Billing Request
   if (intent === "UPGRADE") {
-    const storeHandle = shop.replace(".myshopify.com", "");
-    const appHandle = "fs-custom-badges";
-    return redirect(`https://admin.shopify.com/store/${storeHandle}/charges/${appHandle}/pricing_plans`, {
-      target: "_top",
+    return await billing.request({
+      plan: "Pro Plan",
+      isTest: true,
     });
   }
 
-  // Active Subscription check for backend security enforcement
-  const subscriptionResponse = await admin.graphql(
-    `#graphql
-    query {
-      currentAppInstallation {
-        activeSubscriptions {
-          name
-          status
-        }
-      }
-    }`
-  );
-  const subData = await subscriptionResponse.json();
-  const subscriptions = subData.data?.currentAppInstallation?.activeSubscriptions || [];
-  const isPro = subscriptions.some(
-    (sub) => sub.status === "ACTIVE" && sub.name.toLowerCase().includes("pro")
-  );
+  // Active Billing check for backend security enforcement
+  const billingCheck = await billing.check({
+    plans: ["Pro Plan"],
+    isTest: true,
+  });
+  const isPro = billingCheck.hasActivePayment;
 
   if (intent === "DELETE") {
     const id = String(formData.get("id") || "");
@@ -336,7 +313,6 @@ export const action = async ({ request }) => {
     const existing = await db.badge.findFirst({ where: { id, shop } });
     if (!existing) return json({ success: false, message: "Badge campaign not found." }, { status: 404 });
     
-    // Enforcement: Free tier duplicate lock
     if (!isPro) {
       const count = await db.badge.count({ where: { shop } });
       if (count >= 2) return json({ success: false, message: "Limit reached. Upgrade to Pro to duplicate." });
@@ -401,7 +377,6 @@ export const action = async ({ request }) => {
   const shape = String(formData.get("shape") || "PILL");
   const isPremShape = ["GLASS_GLOW", "DIAGONAL_SLASH", "LUXURY_SEAL", "RIBBON_SHIELD"].includes(shape);
 
-  // Server-side enforcement in case they bypass UI
   if (!isPro) {
     if (isPremShape) {
       return json({ success: false, message: "Premium widgets require the Pro Plan." });
@@ -950,6 +925,24 @@ export default function SaaSAdminApp() {
             {selectedTab === 2 && (
               <BlockStack gap="500">
                 <Text variant="headingLg">Store settings</Text>
+                
+                {/* Additional Upgrade Button Card inside Settings */}
+                {!isPro && (
+                  <Card background="bg-surface-secondary" padding="400">
+                    <InlineStack align="space-between" blockAlign="center">
+                      <BlockStack gap="100">
+                        <Text variant="headingMd">Subscription Plan: Free Plan</Text>
+                        <Text variant="bodySm" tone="subdued">
+                          Unlock all premium shapes and unlimited badge limits instantly.
+                        </Text>
+                      </BlockStack>
+                      <Button variant="primary" onClick={handleUpgrade}>
+                        Upgrade to Pro ($2.99/mo)
+                      </Button>
+                    </InlineStack>
+                  </Card>
+                )}
+
                 <Card padding="500">
                   <BlockStack gap="400">
                     <Text variant="headingMd">Global custom CSS</Text>
