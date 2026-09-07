@@ -221,15 +221,26 @@ function badgeToForm(badge) {
 }
 
 export const loader = async ({ request }) => {
-  const { session, billing } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
 
-  // Check Billing Plan via Shopify Native Billing API
-  const billingCheck = await billing.check({
-    plans: ["Pro Plan"],
-    isTest: true,
-  });
-  const isPro = billingCheck.hasActivePayment;
+  // Check Active Subscriptions via GraphQL
+  const subscriptionResponse = await admin.graphql(
+    `#graphql
+    query {
+      currentAppInstallation {
+        activeSubscriptions {
+          name
+          status
+        }
+      }
+    }`
+  );
+  const subData = await subscriptionResponse.json();
+  const subscriptions = subData.data?.currentAppInstallation?.activeSubscriptions || [];
+  const isPro = subscriptions.some(
+    (sub) => sub.status === "ACTIVE" && sub.name.toLowerCase().includes("pro")
+  );
 
   let settings = await db.appSettings.findUnique({
     where: { shop },
@@ -279,25 +290,27 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const { session, billing } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
   const formData = await request.formData();
   const intent = formData.get("intent");
 
-  // Handle native Shopify Billing Request
-  if (intent === "UPGRADE") {
-    return await billing.request({
-      plan: "Pro Plan",
-      isTest: true,
-    });
-  }
-
-  // Active Billing check for backend security enforcement
-  const billingCheck = await billing.check({
-    plans: ["Pro Plan"],
-    isTest: true,
-  });
-  const isPro = billingCheck.hasActivePayment;
+  const subscriptionResponse = await admin.graphql(
+    `#graphql
+    query {
+      currentAppInstallation {
+        activeSubscriptions {
+          name
+          status
+        }
+      }
+    }`
+  );
+  const subData = await subscriptionResponse.json();
+  const subscriptions = subData.data?.currentAppInstallation?.activeSubscriptions || [];
+  const isPro = subscriptions.some(
+    (sub) => sub.status === "ACTIVE" && sub.name.toLowerCase().includes("pro")
+  );
 
   if (intent === "DELETE") {
     const id = String(formData.get("id") || "");
@@ -488,7 +501,7 @@ export const action = async ({ request }) => {
 };
 
 export default function SaaSAdminApp() {
-  const { settings, badges = [], analytics = {}, isPro } = useLoaderData();
+  const { shop, settings, badges = [], analytics = {}, isPro } = useLoaderData();
   const actionData = useActionData();
   const submit = useSubmit();
   const navigation = useNavigation();
@@ -545,7 +558,11 @@ export default function SaaSAdminApp() {
   };
 
   const handleUpgrade = () => {
-    submit({ intent: "UPGRADE" }, { method: "post" });
+    const storeHandle = (shop || "").replace(".myshopify.com", "");
+    const pricingUrl = `https://admin.shopify.com/store/${storeHandle}/charges/fs-custom-badges-1/pricing_plans`;
+    if (typeof window !== "undefined") {
+      window.open(pricingUrl, "_top");
+    }
   };
 
   const updateForm = (key, value) => {
@@ -926,7 +943,7 @@ export default function SaaSAdminApp() {
               <BlockStack gap="500">
                 <Text variant="headingLg">Store settings</Text>
                 
-                {/* Additional Upgrade Button Card inside Settings */}
+                {/* Upgrade Button Card inside Settings */}
                 {!isPro && (
                   <Card background="bg-surface-secondary" padding="400">
                     <InlineStack align="space-between" blockAlign="center">
