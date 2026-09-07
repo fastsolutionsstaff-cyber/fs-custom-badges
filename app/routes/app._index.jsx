@@ -221,15 +221,26 @@ function badgeToForm(badge) {
 }
 
 export const loader = async ({ request }) => {
-  const { session, billing } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
 
-  // Check Billing Plan
-  const billingCheck = await billing.check({
-    plans: ["Pro Plan"],
-    isTest: true,
-  });
-  const isPro = billingCheck.hasActivePayment;
+  // Check Active Subscriptions via GraphQL
+  const subscriptionResponse = await admin.graphql(
+    `#graphql
+    query {
+      currentAppInstallation {
+        activeSubscriptions {
+          name
+          status
+        }
+      }
+    }`
+  );
+  const subData = await subscriptionResponse.json();
+  const subscriptions = subData.data?.currentAppInstallation?.activeSubscriptions || [];
+  const isPro = subscriptions.some(
+    (sub) => sub.status === "ACTIVE" && sub.name.toLowerCase().includes("pro")
+  );
 
   let settings = await db.appSettings.findUnique({
     where: { shop },
@@ -279,25 +290,37 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const { session, billing } = await authenticate.admin(request);
+  const { session, admin, redirect } = await authenticate.admin(request);
   const shop = session.shop;
   const formData = await request.formData();
   const intent = formData.get("intent");
 
-  // Handle native Shopify Billing Upgrade
+  // Handle Shopify App Pricing Upgrade Redirect
   if (intent === "UPGRADE") {
-    return await billing.request({
-      plan: "Pro Plan",
-      isTest: true,
+    const storeHandle = shop.replace(".myshopify.com", "");
+    const appHandle = "fs-custom-badges";
+    return redirect(`https://admin.shopify.com/store/${storeHandle}/charges/${appHandle}/pricing_plans`, {
+      target: "_top",
     });
   }
 
-  // Active Billing check for backend security enforcement
-  const billingCheck = await billing.check({
-    plans: ["Pro Plan"],
-    isTest: true,
-  });
-  const isPro = billingCheck.hasActivePayment;
+  // Active Subscription check for backend security enforcement
+  const subscriptionResponse = await admin.graphql(
+    `#graphql
+    query {
+      currentAppInstallation {
+        activeSubscriptions {
+          name
+          status
+        }
+      }
+    }`
+  );
+  const subData = await subscriptionResponse.json();
+  const subscriptions = subData.data?.currentAppInstallation?.activeSubscriptions || [];
+  const isPro = subscriptions.some(
+    (sub) => sub.status === "ACTIVE" && sub.name.toLowerCase().includes("pro")
+  );
 
   if (intent === "DELETE") {
     const id = String(formData.get("id") || "");
