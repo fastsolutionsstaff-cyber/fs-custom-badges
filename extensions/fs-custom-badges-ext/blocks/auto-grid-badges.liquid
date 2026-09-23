@@ -142,7 +142,6 @@
             if (position.includes("CENTER")) justifyContent = "center";
             if (position.includes("RIGHT")) justifyContent = "flex-end";
 
-            // Z-INDEX barha kar 99 kar diya gaya hai
             badgeContainer.style.cssText = `
               position: absolute;
               ${topOrBottom}
@@ -170,27 +169,25 @@
             
             badgeElement.innerHTML = `${activeBadge.icon ? `<span>${activeBadge.icon}</span>` : ''} <span>${activeBadge.text}</span>`;
             
-            // --- SMARTER DOM INJECTION ---
-            let targetContainer = card;
-            const imgElement = card.querySelector('img');
-
-            if (imgElement) {
-              // Har theme ke image wrapper ko dhoondne ka behtareen tareeqa
-              const wrapper = imgElement.closest('.card__media, .card__inner, .product-card__image-wrapper, .grid-view-item__image-wrapper, .image-wrap');
-              
-              if (wrapper) {
-                targetContainer = wrapper;
-              } else if (imgElement.parentElement) {
+            // --- IMAGE LAYOUT FIX ---
+            let targetContainer = card.querySelector('.card__media, .card__inner, .product-card__image-wrapper, .grid-view-item__image-wrapper, .image-wrap');
+            
+            if (!targetContainer) {
+              const imgElement = card.querySelector('img');
+              if (imgElement && imgElement.parentElement) {
                 targetContainer = imgElement.parentElement;
+              } else {
+                targetContainer = card;
               }
             }
 
-            // Agar target container link tag (<a>) hai toh absolute position ke liye block lazmi hai
-            if (targetContainer.tagName.toLowerCase() === 'a') {
-              targetContainer.style.display = 'block';
+            // Hum theme ki 'display' property ko nahi chherenge taake image apni jagah aur size par qaim rahe.
+            // Sirf position relative karenge agar element static hai.
+            const computedStyle = window.getComputedStyle(targetContainer);
+            if (computedStyle.position === 'static') {
+              targetContainer.style.position = 'relative';
             }
-
-            targetContainer.style.position = 'relative';
+            
             badgeContainer.appendChild(badgeElement);
             targetContainer.appendChild(badgeContainer);
           }
