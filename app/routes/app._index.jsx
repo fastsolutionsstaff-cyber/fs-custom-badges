@@ -53,7 +53,7 @@ const DEFAULT_FORM = {
   borderColor: "#991B1B",
 
   shape: "PILL",
-  position: "TOP_LEFT",
+  position: "LEFT", // Changed from TOP_LEFT to standard LEFT
 
   fontSize: 12,
   fontWeight: "bold",
@@ -342,7 +342,7 @@ export const action = async ({ request }) => {
           bgColor: existing.bgColor || "#111827",
           textColor: existing.textColor || "#FFFFFF",
           borderColor: existing.borderColor || "#000000",
-          position: existing.position || "TOP_LEFT",
+          position: existing.position || "LEFT",
           shape: existing.shape || "PILL",
           icon: existing.icon || "",
           fontSize: existing.fontSize || 12,
@@ -409,7 +409,7 @@ export const action = async ({ request }) => {
   const bgColor = String(formData.get("bgColor") || "#111827");
   const textColor = String(formData.get("textColor") || "#FFFFFF");
   const borderColor = String(formData.get("borderColor") || "#000000");
-  const position = String(formData.get("position") || "TOP_LEFT");
+  const position = String(formData.get("position") || "LEFT");
 
   const fontSize = parseInt(formData.get("fontSize") || "12", 10) || 12;
   const fontWeight = String(formData.get("fontWeight") || "bold");
@@ -633,6 +633,12 @@ export default function SaaSAdminApp() {
     }
   };
 
+  // --- ALIGNMENT LOGIC FOR LIVE PREVIEW ---
+  let previewJustify = "center";
+  if (formData.position === "LEFT" || formData.position === "TOP_LEFT") previewJustify = "flex-start";
+  if (formData.position === "RIGHT" || formData.position === "TOP_RIGHT") previewJustify = "flex-end";
+
+  // --- SHAPE STYLES LOGIC ---
   let previewShapeStyles = {
     background: formData.bgColor || "#DC2626",
     color: formData.textColor || "#FFFFFF",
@@ -648,7 +654,24 @@ export default function SaaSAdminApp() {
     textTransform: "uppercase",
   };
 
-  if (formData.shape === "GLASS_GLOW") {
+  // Standard Shapes Fixes
+  if (formData.shape === "PILL") {
+    previewShapeStyles.borderRadius = "50px";
+  } else if (formData.shape === "SHARP") {
+    previewShapeStyles.borderRadius = "0px";
+  } else if (formData.shape === "OUTLINE") {
+    previewShapeStyles.background = "transparent";
+    previewShapeStyles.color = formData.bgColor; // Text takes background color
+    previewShapeStyles.border = `2px solid ${formData.bgColor}`;
+  } else if (formData.shape === "GLASSMORPHISM") {
+    previewShapeStyles.background = "rgba(255, 255, 255, 0.2)";
+    previewShapeStyles.backdropFilter = "blur(10px)";
+    previewShapeStyles.border = "1px solid rgba(255, 255, 255, 0.3)";
+    previewShapeStyles.color = formData.textColor;
+    previewShapeStyles.boxShadow = "0 4px 6px rgba(0,0,0,0.1)";
+  }
+  // Premium Shapes
+  else if (formData.shape === "GLASS_GLOW") {
     previewShapeStyles = {
       ...previewShapeStyles,
       background: formData.bgColor || "#1E1B4B",
@@ -1077,6 +1100,18 @@ export default function SaaSAdminApp() {
                         </Grid.Cell>
                       </Grid>
 
+                      {/* --- ALIGNMENT DROPDOWN ADDED HERE --- */}
+                      <Select
+                        label="Alignment (Position)"
+                        options={[
+                          { label: "Left", value: "LEFT" },
+                          { label: "Center", value: "CENTER" },
+                          { label: "Right", value: "RIGHT" },
+                        ]}
+                        value={formData.position === "TOP_LEFT" ? "LEFT" : formData.position}
+                        onChange={(v) => updateForm("position", v)}
+                      />
+
                       <Select
                         label="Shape Style"
                         options={
@@ -1088,10 +1123,10 @@ export default function SaaSAdminApp() {
                                 { label: "Ribbon Shield (Classic Shield Frame)", value: "RIBBON_SHIELD" },
                               ]
                             : [
-                                { label: "Pill", value: "PILL" },
-                                { label: "Sharp", value: "SHARP" },
-                                { label: "Outline", value: "OUTLINE" },
-                                { label: "Glassmorphism", value: "GLASSMORPHISM" },
+                                { label: "Pill (Rounded)", value: "PILL" },
+                                { label: "Sharp (Square)", value: "SHARP" },
+                                { label: "Outline (Transparent)", value: "OUTLINE" },
+                                { label: "Glassmorphism (Frosted)", value: "GLASSMORPHISM" },
                               ]
                         }
                         value={formData.shape}
@@ -1143,7 +1178,7 @@ export default function SaaSAdminApp() {
                           minHeight: "250px",
                           background: "#f8fafc",
                           display: "flex",
-                          justifyContent: "center",
+                          justifyContent: previewJustify, // --- ALIGNMENT APPLIED HERE ---
                           alignItems: "center",
                         }}
                       >

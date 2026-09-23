@@ -39,17 +39,21 @@
           }
           
           if (activeBadge) {
+            // Container create karo taake Left/Center/Right alignment kaam kare
+            const badgeContainer = document.createElement('div');
             const badgeElement = document.createElement('div');
             
             const bg = activeBadge.bgColor || '#2563EB';
             const color = activeBadge.textColor || '#FFFFFF';
             const border = activeBadge.borderColor || bg;
-            const radius = activeBadge.borderRadius || 8;
+            const radius = activeBadge.borderRadius !== undefined ? activeBadge.borderRadius : 8;
             const px = activeBadge.paddingX || 16;
             const py = activeBadge.paddingY || 8;
             const fontSize = activeBadge.fontSize || 12;
             const fontWeight = activeBadge.fontWeight || 'bold';
+            const position = activeBadge.position || 'LEFT';
 
+            // Base Shape CSS
             let shapeCss = `
               background: ${bg};
               color: ${color};
@@ -58,7 +62,44 @@
               padding: ${py}px ${px}px;
             `;
 
-            if (activeBadge.shape === 'GLASS_GLOW') {
+            // Standard Shapes
+            if (activeBadge.shape === 'PILL') {
+              shapeCss = `
+                background: ${bg};
+                color: ${color};
+                border: 1px solid ${border};
+                border-radius: 50px;
+                padding: ${py}px ${px}px;
+              `;
+            } else if (activeBadge.shape === 'SHARP') {
+              shapeCss = `
+                background: ${bg};
+                color: ${color};
+                border: 1px solid ${border};
+                border-radius: 0px;
+                padding: ${py}px ${px}px;
+              `;
+            } else if (activeBadge.shape === 'OUTLINE') {
+              shapeCss = `
+                background: transparent;
+                color: ${bg};
+                border: 2px solid ${bg};
+                border-radius: ${radius}px;
+                padding: ${py}px ${px}px;
+              `;
+            } else if (activeBadge.shape === 'GLASSMORPHISM') {
+              shapeCss = `
+                background: rgba(255, 255, 255, 0.2);
+                color: ${color};
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                border-radius: ${radius}px;
+                padding: ${py}px ${px}px;
+                backdrop-filter: blur(10px);
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+              `;
+            } 
+            // Premium Shapes
+            else if (activeBadge.shape === 'GLASS_GLOW') {
               shapeCss = `
                 background: ${bg};
                 color: ${color};
@@ -98,11 +139,26 @@
               `;
             }
 
-            badgeElement.style.cssText = `
+            // Alignment Logic (Left, Center, Right)
+            let justifyContent = "flex-start";
+            if (position === "CENTER") justifyContent = "center";
+            if (position === "RIGHT" || position === "TOP_RIGHT") justifyContent = "flex-end";
+
+            // Container jo badge ko Left/Center/Right karega
+            badgeContainer.style.cssText = `
               position: absolute;
               top: 10px;
-              left: 10px;
+              left: 0;
+              width: 100%;
+              padding: 0 10px;
+              box-sizing: border-box;
+              display: flex;
+              justify-content: ${justifyContent};
               z-index: 2;
+              pointer-events: none;
+            `;
+
+            badgeElement.style.cssText = `
               font-size: ${fontSize}px;
               font-weight: ${fontWeight};
               display: inline-flex;
@@ -117,7 +173,8 @@
             badgeElement.innerHTML = `${activeBadge.icon ? `<span>${activeBadge.icon}</span>` : ''} <span>${activeBadge.text}</span>`;
             
             card.style.position = 'relative';
-            card.appendChild(badgeElement);
+            badgeContainer.appendChild(badgeElement);
+            card.appendChild(badgeContainer);
           }
         });
       }
