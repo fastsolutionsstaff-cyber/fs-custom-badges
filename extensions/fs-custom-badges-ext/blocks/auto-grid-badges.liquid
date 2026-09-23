@@ -39,7 +39,6 @@
           }
           
           if (activeBadge) {
-            // Container create karo taake Left/Center/Right alignment kaam kare
             const badgeContainer = document.createElement('div');
             const badgeElement = document.createElement('div');
             
@@ -51,9 +50,8 @@
             const py = activeBadge.paddingY || 8;
             const fontSize = activeBadge.fontSize || 12;
             const fontWeight = activeBadge.fontWeight || 'bold';
-            const position = activeBadge.position || 'LEFT';
+            const position = activeBadge.position || 'TOP_LEFT'; // Database standard
 
-            // Base Shape CSS
             let shapeCss = `
               background: ${bg};
               color: ${color};
@@ -62,7 +60,6 @@
               padding: ${py}px ${px}px;
             `;
 
-            // Standard Shapes
             if (activeBadge.shape === 'PILL') {
               shapeCss = `
                 background: ${bg};
@@ -98,7 +95,6 @@
                 box-shadow: 0 4px 6px rgba(0,0,0,0.1);
               `;
             } 
-            // Premium Shapes
             else if (activeBadge.shape === 'GLASS_GLOW') {
               shapeCss = `
                 background: ${bg};
@@ -139,15 +135,17 @@
               `;
             }
 
-            // Alignment Logic (Left, Center, Right)
+            // Alignment Logic (Up/Down + Left/Center/Right)
             let justifyContent = "flex-start";
-            if (position === "CENTER") justifyContent = "center";
-            if (position === "RIGHT" || position === "TOP_RIGHT") justifyContent = "flex-end";
+            let topOrBottom = "top: 10px;";
+            
+            if (position.includes("BOTTOM")) topOrBottom = "bottom: 10px;";
+            if (position.includes("CENTER")) justifyContent = "center";
+            if (position.includes("RIGHT")) justifyContent = "flex-end";
 
-            // Container jo badge ko Left/Center/Right karega
             badgeContainer.style.cssText = `
               position: absolute;
-              top: 10px;
+              ${topOrBottom}
               left: 0;
               width: 100%;
               padding: 0 10px;

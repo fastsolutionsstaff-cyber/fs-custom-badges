@@ -53,7 +53,7 @@ const DEFAULT_FORM = {
   borderColor: "#991B1B",
 
   shape: "PILL",
-  position: "LEFT", // Changed from TOP_LEFT to standard LEFT
+  position: "TOP_LEFT", // FIXED: Reverted to database standard
 
   fontSize: 12,
   fontWeight: "bold",
@@ -224,7 +224,6 @@ export const loader = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
 
-  // Check Active Subscriptions via GraphQL
   const subscriptionResponse = await admin.graphql(
     `#graphql
     query {
@@ -342,7 +341,7 @@ export const action = async ({ request }) => {
           bgColor: existing.bgColor || "#111827",
           textColor: existing.textColor || "#FFFFFF",
           borderColor: existing.borderColor || "#000000",
-          position: existing.position || "LEFT",
+          position: existing.position || "TOP_LEFT", // FIXED
           shape: existing.shape || "PILL",
           icon: existing.icon || "",
           fontSize: existing.fontSize || 12,
@@ -409,7 +408,7 @@ export const action = async ({ request }) => {
   const bgColor = String(formData.get("bgColor") || "#111827");
   const textColor = String(formData.get("textColor") || "#FFFFFF");
   const borderColor = String(formData.get("borderColor") || "#000000");
-  const position = String(formData.get("position") || "LEFT");
+  const position = String(formData.get("position") || "TOP_LEFT"); // FIXED
 
   const fontSize = parseInt(formData.get("fontSize") || "12", 10) || 12;
   const fontWeight = String(formData.get("fontWeight") || "bold");
@@ -512,7 +511,6 @@ export default function SaaSAdminApp() {
   const [globalCssState, setGlobalCssState] = useState(settings?.globalCustomCss || "");
   const [formData, setFormData] = useState(DEFAULT_FORM);
   
-  // Upgrade Popup States
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [upgradeMessage, setUpgradeMessage] = useState("");
 
@@ -527,7 +525,6 @@ export default function SaaSAdminApp() {
       isPrem = ["GLASS_GLOW", "DIAGONAL_SLASH", "LUXURY_SEAL", "RIBBON_SHIELD"].includes(badge.shape);
     }
 
-    // Limit Interceptor Check
     if (!isPro) {
       if (isPrem) {
         setUpgradeMessage("Upgrade to Pro to create and unlock Premium widgets.");
@@ -633,10 +630,13 @@ export default function SaaSAdminApp() {
     }
   };
 
-  // --- ALIGNMENT LOGIC FOR LIVE PREVIEW ---
-  let previewJustify = "center";
-  if (formData.position === "LEFT" || formData.position === "TOP_LEFT") previewJustify = "flex-start";
-  if (formData.position === "RIGHT" || formData.position === "TOP_RIGHT") previewJustify = "flex-end";
+  // --- ALIGNMENT LOGIC FOR LIVE PREVIEW (TOP/BOTTOM FIXED) ---
+  let previewAlignItems = "flex-start";
+  let previewJustify = "flex-start";
+
+  if (formData.position.includes("BOTTOM")) previewAlignItems = "flex-end";
+  if (formData.position.includes("CENTER")) previewJustify = "center";
+  if (formData.position.includes("RIGHT")) previewJustify = "flex-end";
 
   // --- SHAPE STYLES LOGIC ---
   let previewShapeStyles = {
@@ -654,14 +654,13 @@ export default function SaaSAdminApp() {
     textTransform: "uppercase",
   };
 
-  // Standard Shapes Fixes
   if (formData.shape === "PILL") {
     previewShapeStyles.borderRadius = "50px";
   } else if (formData.shape === "SHARP") {
     previewShapeStyles.borderRadius = "0px";
   } else if (formData.shape === "OUTLINE") {
     previewShapeStyles.background = "transparent";
-    previewShapeStyles.color = formData.bgColor; // Text takes background color
+    previewShapeStyles.color = formData.bgColor;
     previewShapeStyles.border = `2px solid ${formData.bgColor}`;
   } else if (formData.shape === "GLASSMORPHISM") {
     previewShapeStyles.background = "rgba(255, 255, 255, 0.2)";
@@ -670,7 +669,6 @@ export default function SaaSAdminApp() {
     previewShapeStyles.color = formData.textColor;
     previewShapeStyles.boxShadow = "0 4px 6px rgba(0,0,0,0.1)";
   }
-  // Premium Shapes
   else if (formData.shape === "GLASS_GLOW") {
     previewShapeStyles = {
       ...previewShapeStyles,
@@ -740,7 +738,6 @@ export default function SaaSAdminApp() {
           </Banner>
         )}
 
-        {/* Professional Upgrade Banner for Free Plan Users */}
         {!isPro && (
           <Card background="bg-surface-secondary" padding="400">
             <InlineStack align="space-between" blockAlign="center">
@@ -966,7 +963,6 @@ export default function SaaSAdminApp() {
               <BlockStack gap="500">
                 <Text variant="headingLg">Store settings</Text>
                 
-                {/* Upgrade Button Card inside Settings */}
                 {!isPro && (
                   <Card background="bg-surface-secondary" padding="400">
                     <InlineStack align="space-between" blockAlign="center">
@@ -997,7 +993,6 @@ export default function SaaSAdminApp() {
           </Box>
         </Card>
 
-        {/* Upgrade Pro Modal Popup */}
         <Modal
           open={upgradeModalOpen}
           onClose={() => setUpgradeModalOpen(false)}
@@ -1017,7 +1012,6 @@ export default function SaaSAdminApp() {
           </Modal.Section>
         </Modal>
 
-        {/* Standard Creation Modal */}
         <Modal
           open={modalOpen}
           onClose={() => setModalOpen(false)}
@@ -1100,15 +1094,18 @@ export default function SaaSAdminApp() {
                         </Grid.Cell>
                       </Grid>
 
-                      {/* --- ALIGNMENT DROPDOWN ADDED HERE --- */}
+                      {/* --- ALIGNMENT DROPDOWN (TOP/BOTTOM FIXED) --- */}
                       <Select
                         label="Alignment (Position)"
                         options={[
-                          { label: "Left", value: "LEFT" },
-                          { label: "Center", value: "CENTER" },
-                          { label: "Right", value: "RIGHT" },
+                          { label: "Top Left", value: "TOP_LEFT" },
+                          { label: "Top Center", value: "TOP_CENTER" },
+                          { label: "Top Right", value: "TOP_RIGHT" },
+                          { label: "Bottom Left", value: "BOTTOM_LEFT" },
+                          { label: "Bottom Center", value: "BOTTOM_CENTER" },
+                          { label: "Bottom Right", value: "BOTTOM_RIGHT" },
                         ]}
-                        value={formData.position === "TOP_LEFT" ? "LEFT" : formData.position}
+                        value={formData.position}
                         onChange={(v) => updateForm("position", v)}
                       />
 
@@ -1178,8 +1175,8 @@ export default function SaaSAdminApp() {
                           minHeight: "250px",
                           background: "#f8fafc",
                           display: "flex",
-                          justifyContent: previewJustify, // --- ALIGNMENT APPLIED HERE ---
-                          alignItems: "center",
+                          justifyContent: previewJustify,
+                          alignItems: previewAlignItems, // FIXED TO SHOW UP/DOWN
                         }}
                       >
                         <div style={previewShapeStyles}>
