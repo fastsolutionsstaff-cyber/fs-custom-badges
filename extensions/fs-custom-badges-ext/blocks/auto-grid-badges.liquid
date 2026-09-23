@@ -50,7 +50,7 @@
             const py = activeBadge.paddingY || 8;
             const fontSize = activeBadge.fontSize || 12;
             const fontWeight = activeBadge.fontWeight || 'bold';
-            const position = activeBadge.position || 'TOP_LEFT'; // Database standard
+            const position = activeBadge.position || 'TOP_LEFT';
 
             let shapeCss = `
               background: ${bg};
@@ -135,7 +135,7 @@
               `;
             }
 
-            // Alignment Logic (Up/Down + Left/Center/Right)
+            // Alignment Logic
             let justifyContent = "flex-start";
             let topOrBottom = "top: 10px;";
             
@@ -170,9 +170,24 @@
             
             badgeElement.innerHTML = `${activeBadge.icon ? `<span>${activeBadge.icon}</span>` : ''} <span>${activeBadge.text}</span>`;
             
-            card.style.position = 'relative';
-            badgeContainer.appendChild(badgeElement);
-            card.appendChild(badgeContainer);
+            // === YEH PART FIX KIYA HAI IMAGE PAR BADGE DIKHANE KE LIYE ===
+            // 1. Shopify theme (Dawn, Debut, etc) ka image wrapper dhoondho
+            let imageWrapper = card.querySelector('.card__inner, .card__media, .grid-view-item__image-wrapper, .product-card__image-wrapper');
+            
+            // 2. Agar standard class na mile, to img tag ka parent pakar lo
+            if (!imageWrapper) {
+              const img = card.querySelector('img');
+              imageWrapper = img ? img.parentElement : card;
+            }
+            
+            // 3. Agar parent <a> link hai, to usko block bnao taake absolute position sahi kaam kare
+            if (imageWrapper.tagName.toLowerCase() === 'a') {
+              imageWrapper.style.display = 'block';
+            }
+
+            imageWrapper.style.position = 'relative';
+            imageWrapper.appendChild(badgeContainer);
+            // === FIX END ===
           }
         });
       }
